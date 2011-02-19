@@ -2,7 +2,7 @@
 
 /**
  *  @version $Revision: 1381 $
- *  @author Translator Name <yourmail@example.com>
+ *  @author E Camden Fisher <fishnix@gmail.com>
  *  EN-Revision: Revision of lang_en.inc.php
  */
 

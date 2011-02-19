@@ -1,7 +1,7 @@
 <?php
 
 // AWS Plugin for Serendipity
-// 20110212 by E Camden Fisher <fish@fishnix.net>
+// 20110212 by E Camden Fisher <fishnix@gmail.com>
 
 // Temporary for testing
 header("Content-type: text/plain; charset=utf-8");

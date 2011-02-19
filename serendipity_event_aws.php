@@ -1,7 +1,7 @@
 <?php 
 
 // AWS Plugin for Serendipity
-// 20110212 by E Camden Fisher <fish@fishnix.net>
+// 20110212 by E Camden Fisher <fishnix@gmail.com>
 
 if (IN_serendipity != true) {
 		die ("Don't hack!"); 
@@ -139,6 +139,9 @@ class serendipity_event_aws extends serendipity_event
 				
 				if (isset($hooks[$event])) {
 					switch($event) {
+						case 'backend_image_add';
+							global $new_media;
+						break;
 						case 'frontend_display':
 						break;
 					}
