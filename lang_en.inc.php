@@ -21,5 +21,6 @@
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME',				'AWS Bucket Name.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME_DESC',	'Name of the bucket to put your bits in.');
 @define('PLUGIN_EVENT_AWS_INSTALL', 											'<P><strong>This is an experimental plugin.  I can\'t promise you won\'t lose all of your data.</strong>');
-
+@define('PLUGIN_EVENT_AWS_UPLOAD_FILES',									'Upload files to Amazon S3');
+@define('PLUGIN_EVENT_AWS_UPLOAD_FILES_DESC',							'Should we upload image to S3?');
 ?>

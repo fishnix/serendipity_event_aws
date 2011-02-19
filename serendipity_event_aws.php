@@ -174,12 +174,15 @@ class serendipity_event_aws extends serendipity_event
 						case 'backend_image_add':
 							global $new_media;
 							
-							// retrieve file type
+							$full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
 							$target_img = $eventData;
-							
 							preg_match('@(^.*/)+(.*\.+\w*)@', $target_img, $matches);
 							$target_dir = $matches[1];
 							$filename   = $matches[2];
+							
+							$fp_length = strlen($full_path);
+							$rel_filename = substr($target_img, $fp_length);
+							
 							$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
               
 							// only if AmazonS3 class is loaded and radio button for s3 is selected
@@ -193,7 +196,7 @@ class serendipity_event_aws extends serendipity_event
 								$s3 = new AmazonS3($aws_key, $aws_secret_key);
 
 								// upload image to amazon s3								
-								$uploadresponse = $s3->create_object($bucket, $filename, array(
+								$uploadresponse = $s3->create_object($bucket, $rel_filename, array(
 									'fileUpload' 		=> $target_img,
 									'acl' 					=> $s3::ACL_PUBLIC,
 									'storage' 			=> $s3::STORAGE_REDUCED
@@ -201,8 +204,9 @@ class serendipity_event_aws extends serendipity_event
 								
 								print_r($uploadresponse);
 								
-								$createresponse = $s3->create_object($bucket, 'plain.txt', array(
-									'body' => $target_img,
+								//$serendipity['serendipityPath'] . $serendipity['uploadPath']
+								$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
+									'body' => $full_path . " " . $target_img . " " . $rel_filename,
 									'contentType' => 'text/plain',
 									'acl' => $s3::ACL_PUBLIC,
 									'storage' => $s3::STORAGE_REDUCED
