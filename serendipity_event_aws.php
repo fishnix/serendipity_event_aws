@@ -82,6 +82,7 @@ class serendipity_event_aws extends serendipity_event
             $conf_array[] = $element['name'];
         }
 
+				$conf_array[] = 'using_aws_s3';
 				$conf_array[] = 'aws_key';
 				$conf_array[] = 'aws_secret_key';
 				$conf_array[] = 'aws_account_id';
@@ -98,6 +99,12 @@ class serendipity_event_aws extends serendipity_event
 
 		function introspect_config_item($name, &$propbag) {
 			switch($name) {
+				case 'using_aws_s3':
+					$propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_ON);
+					$propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_ON_DESC);
+					$propbag->add('default',        'true');
+					$propbag->add('type',           'boolean');
+				break;
 				case 'aws_key':
 					$propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_KEY);
 					$propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_KEY_DESC);
@@ -154,16 +161,16 @@ class serendipity_event_aws extends serendipity_event
 							if (class_exists('AmazonS3')) {
 									$checkedY = "";
 									$checkedN = "";
-									$this->get_config('s3upload') ? $checkedY = "checked='checked'" : $checkedN = "checked='checked'";
+									$this->get_config('using_aws_s3') ? $checkedY = "checked='checked'" : $checkedN = "checked='checked'";
 									?>
 										<p>
 										<strong><?php echo PLUGIN_EVENT_AWS_UPLOAD_FILES;?></strong><br />
 										<?php echo PLUGIN_EVENT_AWS_UPLOAD_FILES_DESC;?>
 										<p>
-											<input type="radio" class="input_radio" id="uploads3_yes" name="serendipity[uploads3]" value="<?php echo YES;?>"
-											<?php echo $checkedY;?>><label for="uploads3_yes"><?php echo YES;?></label>
-											<input type="radio" class="input_radio" id="uploads3_no" name="serendipity[uploads3]" value="<?php echo NO;?>"
-											<?php echo $checkedN;?>><label for="uploads3_no"><?php echo NO;?></label>
+											<input type="radio" class="input_radio" id="uploads3_yes" name="serendipity[using_aws_s3]" value="<?php echo YES;?>"
+												<?php echo $checkedY;?>><label for="uploads3_yes"><?php echo YES;?></label>
+											<input type="radio" class="input_radio" id="uploads3_no" name="serendipity[using_aws_s3]" value="<?php echo NO;?>"
+												<?php echo $checkedN;?>><label for="uploads3_no"><?php echo NO;?></label>
 										</p>
 										</p>
 		
@@ -186,7 +193,7 @@ class serendipity_event_aws extends serendipity_event
 							$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
               
 							// only if AmazonS3 class is loaded and radio button for s3 is selected
-							if ((class_exists('AmazonS3')) && ($serendipity['POST']['uploads3'] == YES)) {
+							if ((class_exists('AmazonS3')) && ($serendipity['POST']['using_aws_s3'] == YES)) {
 
 								// get config information
 								$aws_key 				= $this->get_config('aws_key');
@@ -195,24 +202,35 @@ class serendipity_event_aws extends serendipity_event
 							
 								$s3 = new AmazonS3($aws_key, $aws_secret_key);
 
-								// upload image to amazon s3								
-								$uploadresponse = $s3->create_object($bucket, $rel_filename, array(
-									'fileUpload' 		=> $target_img,
-									'acl' 					=> $s3::ACL_PUBLIC,
-									'storage' 			=> $s3::STORAGE_REDUCED
-								));
+								if ($s3->if_bucket_exists($bucket)) {
 								
-								print_r($uploadresponse);
+									// upload image to amazon s3								
+									$uploadresponse = $s3->create_object($bucket, $rel_filename, array(
+										'fileUpload' 		=> $target_img,
+										'acl' 					=> AmazonS3::ACL_PUBLIC,
+										'storage' 			=> AmazonS3::STORAGE_REDUCED
+									));
 								
-								//$serendipity['serendipityPath'] . $serendipity['uploadPath']
-								$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
-									'body' => $full_path . " " . $target_img . " " . $rel_filename,
-									'contentType' => 'text/plain',
-									'acl' => $s3::ACL_PUBLIC,
-									'storage' => $s3::STORAGE_REDUCED
-								));
+									//print_r($uploadresponse);
+								
+									$upload_log = "Full Path: " .$full_path . "\n" . "Full Filename: " .$target_img . "\n" .
+												"Relative Filename: " . $rel_filename . "\n";
+								
+									//$serendipity['serendipityPath'] . $serendipity['uploadPath']
+									$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
+										'body' => $upload_log,
+										'contentType' => 'text/plain',
+										'acl' => AmazonS3::ACL_PUBLIC,
+										'storage' => AmazonS3::STORAGE_REDUCED
+									));
 
-								print_r($createresponse);
+									//print_r($createresponse);
+									
+									echo PLUGIN_EVENT_AWS_UPLOAD_SUCCESS;
+									
+								} else {
+									echo PLUGIN_EVENT_AWS_UPLOAD_FAILED;
+								}
 								
 							}	
 						break;
