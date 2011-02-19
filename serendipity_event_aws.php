@@ -65,8 +65,19 @@ class serendipity_event_aws extends serendipity_event
 				'frontend_display' => true
 				));
 
+			$this->markup_elements = array(
+				array(
+					'name'     => 'ENTRY_BODY',
+					'element'  => 'body',
+					),
+				array(
+					'name'     => 'EXTENDED_BODY',
+					'element'  => 'extended',
+					)
+				);
 
         $conf_array = array();
+
         foreach($this->markup_elements as $element) {
             $conf_array[] = $element['name'];
         }
@@ -139,11 +150,72 @@ class serendipity_event_aws extends serendipity_event
 				
 				if (isset($hooks[$event])) {
 					switch($event) {
-						case 'backend_image_add';
-							global $new_media;
+						case 'backend_image_addform':
+							if (class_exists('AmazonS3')) {
+									$checkedY = "";
+									$checkedN = "";
+									$this->get_config('s3upload') ? $checkedY = "checked='checked'" : $checkedN = "checked='checked'";
+									?>
+										<p>
+										<strong><?php echo PLUGIN_EVENT_AWS_UPLOAD_FILES;?></strong><br />
+										<?php echo PLUGIN_EVENT_AWS_UPLOAD_FILES_DESC;?>
+										<p>
+											<input type="radio" class="input_radio" id="uploads3_yes" name="serendipity[uploads3]" value="<?php echo YES;?>"
+											<?php echo $checkedY;?>><label for="uploads3_yes"><?php echo YES;?></label>
+											<input type="radio" class="input_radio" id="uploads3_no" name="serendipity[uploads3]" value="<?php echo NO;?>"
+											<?php echo $checkedN;?>><label for="uploads3_no"><?php echo NO;?></label>
+										</p>
+										</p>
+		
+									<?php
+								}
 						break;
+						
+						case 'backend_image_add':
+							global $new_media;
+							
+							// retrieve file type
+							$target_img = $eventData;
+							
+							preg_match('@(^.*/)+(.*\.+\w*)@', $target_img, $matches);
+							$target_dir = $matches[1];
+							$filename   = $matches[2];
+							$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
+              
+							// only if AmazonS3 class is loaded and radio button for s3 is selected
+							if ((class_exists('AmazonS3')) && ($serendipity['POST']['uploads3'] == YES)) {
+
+								// get config information
+								$aws_key 				= $this->get_config('aws_key');
+								$aws_secret_key = $this->get_config('aws_secret_key');
+								$bucket 				= $this->get_config('aws_s3_bucket_name');
+							
+								$s3 = new AmazonS3($aws_key, $aws_secret_key);
+
+								// upload image to amazon s3								
+								$uploadresponse = $s3->create_object($bucket, $filename, array(
+									'fileUpload' 		=> $target_img,
+									'acl' 					=> $s3::ACL_PUBLIC,
+									'storage' 			=> $s3::STORAGE_REDUCED
+								));
+								
+								print_r($uploadresponse);
+								
+								$createresponse = $s3->create_object($bucket, 'plain.txt', array(
+									'body' => $target_img,
+									'contentType' => 'text/plain',
+									'acl' => $s3::ACL_PUBLIC,
+									'storage' => $s3::STORAGE_REDUCED
+								));
+
+								print_r($createresponse);
+								
+							}	
+						break;
+						
 						case 'frontend_display':
 						break;
+						
 					}
 				}
 				return true;
