@@ -14,16 +14,16 @@ This is nowhere near complete, so if you stumble upon it, don't use it.
 	*	Swap out links/src to local files with those at S3 on demand per entry
 	
 ##What you will need to use this plugin:
-	*	AWS Account
+	* AWS Account
 
-###Why?
+##Why?
 
 I have a couple reasons...
 
-	1. Cloud is cool
-	2. S3 is scalable, redundant storage
-	3. S3 for media allows me to use the cloudfront cdn on bursty days
-	4. S3 for media removes one of two things that make a local instance of s9y "special".  (DB is the other)  Using cfg mgmt (chef), I can deploy a s9y server on demand, and with a few quick clicks (literally) have the site up and running
+	* Cloud is cool
+	* S3 is scalable, redundant storage
+	* S3 for media allows me to use the cloudfront cdn on bursty days
+	* S3 for media removes one of two things that make a local instance of s9y "special".  (DB is the other)  Using cfg mgmt (chef), I can deploy a s9y server on demand, and with a few quick clicks (literally) have the site up and running
 	
 	
 ##Todo

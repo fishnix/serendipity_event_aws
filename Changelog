@@ -1,2 +1,13 @@
 
-20110212 0.0.1 Initial Version
+20110212 ECF
+ * Initial Version
+ * First shot at defining config items
+ * Got plugin to play nicely with s9y config screen/install/etc
+
+20110219 ECF
+ * Moved to github (https://github.com/fishnix/serendipity_event_aws)
+ * Add enable/disable globally
+ * Basic uploading to S3 works with media manager "add media"
+
+20110221 ECF
+ * Basic doco started via README.md

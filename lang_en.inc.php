@@ -8,8 +8,8 @@
 
 @define('PLUGIN_EVENT_AWS_NAME',													'AWS Plugin');
 @define('PLUGIN_EVENT_AWS_DESC',													'Plugin to support Amazon Web Services');
-@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_ON',										'Enable AWS');
-@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_ON_DESC',							'Enables the use of AWS features');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_ON',								'Enable AWS');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_ON_DESC',						'Enables the use of AWS features');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_KEY',     							'Amazon Web Services Key.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_KEY_DESC',    					'Found in the AWS Security Credentials.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_SECRET_KEY',     			'Amazon Web Services Secret Key.');
