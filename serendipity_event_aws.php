@@ -179,16 +179,20 @@ class serendipity_event_aws extends serendipity_event
 						break;
 						
 						case 'backend_image_add':
-							global $new_media;
-							
 							$full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
 							$target_img = $eventData;
-							preg_match('@(^.*/)+(.*\.+\w*)@', $target_img, $matches);
-							$target_dir = $matches[1];
-							$filename   = $matches[2];
+							
+							preg_match('@(^.*/)+(.*)\.+(\w*)@',$target_img, $matches);
+              $target_dir   = $matches[1];
+              $basename     = $matches[2];
+              $extension    = $matches[3];
+              $filename     = $basename.".".$extension;
+							#$thumbname  	= $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
+							$target_thm 	= $target_dir . $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
 							
 							$fp_length = strlen($full_path);
 							$rel_filename = substr($target_img, $fp_length);
+							$rel_thumbname = substr($target_thm, $fp_length);
 							
 							$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
               
@@ -205,26 +209,38 @@ class serendipity_event_aws extends serendipity_event
 								if ($s3->if_bucket_exists($bucket)) {
 								
 									// upload image to amazon s3								
-									$uploadresponse = $s3->create_object($bucket, $rel_filename, array(
+									$media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
 										'fileUpload' 		=> $target_img,
 										'acl' 					=> AmazonS3::ACL_PUBLIC,
 										'storage' 			=> AmazonS3::STORAGE_REDUCED
 									));
+									
+									//upload thumbnail to amazon s3
+									$thumb_uploadresponse = $s3->create_object($bucket, $rel_thumbname, array(
+										'fileUpload'		=> $target_thm,
+										'acl'						=> AmazonS3::ACL_PUBLIC,
+										'storage'				=> AmazonS3::STORAGE_REDUCED
+									));
+									
+									
+									$upload_log = "Full Path: " .						$full_path . "\n" . 
+																"Full Filename: " . 			$target_img . "\n" .
+																"Relative Filename: " . 	$rel_filename . "\n" . 
+																"Full Thumbname: " .			$target_thm . "\n" .
+																"Relative Thumbname: " . 	$rel_thumbname . "\n" .
+																"Target Dir: " . 					$target_dir . "\n";
 								
-									//print_r($uploadresponse);
+									// list all props in serendipity
+#									foreach ($serendipity as $key=>$value) {
+#										$upload_log = $upload_log . "\n" . $key . ":" . $value;
+#									}
 								
-									$upload_log = "Full Path: " .$full_path . "\n" . "Full Filename: " .$target_img . "\n" .
-												"Relative Filename: " . $rel_filename . "\n";
-								
-									//$serendipity['serendipityPath'] . $serendipity['uploadPath']
 									$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
 										'body' => $upload_log,
 										'contentType' => 'text/plain',
 										'acl' => AmazonS3::ACL_PUBLIC,
 										'storage' => AmazonS3::STORAGE_REDUCED
 									));
-
-									//print_r($createresponse);
 									
 									echo PLUGIN_EVENT_AWS_UPLOAD_SUCCESS;
 									
@@ -235,7 +251,7 @@ class serendipity_event_aws extends serendipity_event
 							}	
 						break;
 						
-						case 'frontend_display':
+						case 'backend_media_makethumb':
 						break;
 						
 					}

@@ -28,7 +28,6 @@ I have a couple reasons...
 	
 ##Todo
 
-	* Ensure multiple file upload works
 	* Upload thumbs to S3 (with config option?)
 	* Job to sync files from local repo to S3
 	* Job to check sync of files
