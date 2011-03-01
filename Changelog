@@ -14,3 +14,6 @@
 
 20110225 ECF
  * Started thumbnail upload code
+
+20110228 ECF
+ * Started code to munge entries and insert S3 paths for img src

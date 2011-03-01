@@ -65,16 +65,20 @@ class serendipity_event_aws extends serendipity_event
 				'frontend_display' => true
 				));
 
-			$this->markup_elements = array(
-				array(
-					'name'     => 'ENTRY_BODY',
-					'element'  => 'body',
-					),
-				array(
-					'name'     => 'EXTENDED_BODY',
-					'element'  => 'extended',
-					)
-				);
+      $this->markup_elements = array(
+          array(
+            'name'     => 'ENTRY_BODY',
+            'element'  => 'body',
+          ),
+          array(
+            'name'     => 'EXTENDED_BODY',
+            'element'  => 'extended',
+          ),
+          array(
+            'name'     => 'HTML_NUGGET',
+            'element'  => 'html_nugget',
+          )
+      );
 
         $conf_array = array();
 
@@ -149,6 +153,15 @@ class serendipity_event_aws extends serendipity_event
 			
 			return true;
 		}
+		
+		function install() {
+        serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
+    }
+
+    function uninstall() {
+        serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
+        serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
+    }
 		
     function event_hook($event, &$bag, &$eventData) {
         global $serendipity;
@@ -231,10 +244,11 @@ class serendipity_event_aws extends serendipity_event
 																"Target Dir: " . 					$target_dir . "\n";
 								
 									// list all props in serendipity
-#									foreach ($serendipity as $key=>$value) {
-#										$upload_log = $upload_log . "\n" . $key . ":" . $value;
-#									}
+									foreach ($serendipity as $key=>$value) {
+										$upload_log = $upload_log . "\n" . $key . ":" . $value;
+									}
 								
+								 // upload log b/c it's an easy way to see what's going on
 									$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
 										'body' => $upload_log,
 										'contentType' => 'text/plain',
@@ -251,13 +265,44 @@ class serendipity_event_aws extends serendipity_event
 							}	
 						break;
 						
-						case 'backend_media_makethumb':
-						break;
-						
-					}
-				}
-				return true;
+            case 'frontend_display':
+
+            	foreach ($this->markup_elements as $temp) {
+                	if (serendipity_db_bool($this->get_config($temp['name'], true)) && isset($eventData[$temp['element']])) {
+                    	$element = $temp['element'];
+											$bucket  = $this->get_config('aws_s3_bucket_name');
+											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
+											
+                    	$eventData[$element] = $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
+                	}
+            	}
+
+            	return true;
+
+           	break;
+
+						default:
+							return false;
+					}	
+			} else {
+				return false;
+			}
 		}
+		
+		// munge text and replace img src with s3 
+		function _s9y_aws_munge($text, $uploadHTTPPath, $bucket) {
+
+			// Cleanup slashes for regex
+			$uploadHTTPPath = str_replace('/','\/', $uploadHTTPPath);
+
+			$pattern = '/' . $uploadHTTPPath . '/';
+			$replace = "https://s3.amazonaws.com/$bucket/";
+		
+			$text = preg_replace($pattern, $replace, $text); 
+
+			return $text;
+
+    }
 }
 
 ?>

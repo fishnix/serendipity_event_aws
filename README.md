@@ -28,8 +28,9 @@ I have a couple reasons...
 	
 ##Todo
 
-	* Upload thumbs to S3 (with config option?)
 	* Job to sync files from local repo to S3
 	* Job to check sync of files
 	* Job to sync files from S3 to local repo?
-	* Code (js?) to swap out local images in a post with S3 ones
+	* Harden code to swap out img src (it's really dumb right now)
+	* Make sure uploads are confirmed, check return codes, etc
+	* Add config option for enable/disable per post?
