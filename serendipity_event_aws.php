@@ -281,7 +281,14 @@ class serendipity_event_aws extends serendipity_event
 											$bucket  = $this->get_config('aws_s3_bucket_name');
 											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
 											
-											$eventData[$element] = $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
+											$text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
+											
+											// TESTNG
+											//$bucket_list = $this->_s9y_get_s3_list();
+											///$text = $text . ' STUFF IN THE BUCKET: ' . $bucket_list;
+											
+											$eventData[$element] = $text;		
+											
 										}
 									}
 								}
@@ -311,10 +318,6 @@ class serendipity_event_aws extends serendipity_event
 			
 			// munge!!
 			$text = preg_replace($pattern, $replace, $text); 
-			
-			// TESTNG
-			//$bucket_list = $this->_s9y_get_s3_list();
-			//$text = $text . ' STUFF IN THE BUCKET: ' . $bucket_list;
 			
 			return $text;
 
