@@ -31,34 +31,34 @@ class serendipity_event_aws extends serendipity_event
     {
         global $serendipity;
 
-        $propbag->add('name',          PLUGIN_EVENT_AWS_NAME);
-        $propbag->add('description',   PLUGIN_EVENT_AWS_DESC);
-        $propbag->add('stackable',     false);
-        $propbag->add('groups', array('IMAGES'));
-        $propbag->add('author',        'E Camden Fisher');
-        $propbag->add('version',       '0.0.1');
-        $propbag->add('requirements',  array(
+        $propbag->add('name',         PLUGIN_EVENT_AWS_NAME);
+        $propbag->add('description',  PLUGIN_EVENT_AWS_DESC);
+        $propbag->add('stackable',    false);
+        $propbag->add('groups', 			array('IMAGES'));
+        $propbag->add('author',       'E Camden Fisher');
+        $propbag->add('version',      '0.0.1');
+        $propbag->add('requirements', array(
             'serendipity' => '1.5.0',
             'smarty'      => '2.6.7',
             'php'         => '5.2.0'
         ));
 
 			$propbag->add('event_hooks',   array(
-				'entries_header' => true,
-				'entry_display' => true,
-				'backend_entry_presave' => true,
-				'backend_publish' => true,
-				'backend_save' => true,
-				'frontend_image_add_unknown' => true,
-				'frontend_image_add_filenameonly' => true,
-				'frontend_image_selector_submit' => true,
-				'frontend_image_selector_more' => true,
-				'frontend_image_selector_imagecomment' => true,
-				'frontend_image_selector_imagelink' => true,
-				'frontend_image_selector_imagealign' => true,
-				'frontend_image_selector_imagesize' => true,
-				'frontend_image_selector_hiddenfields' => true,
-				'frontend_image_selector' => true,
+				//entries_header' => true,
+				//entry_display' => true,
+				//backend_entry_presave' => true,
+				//'backend_publish' => true,
+				//'backend_save' => true,
+				//'frontend_image_add_unknown' => true,
+				//'frontend_image_add_filenameonly' => true,
+				//'frontend_image_selector_submit' => true,
+				//'frontend_image_selector_more' => true,
+				//'frontend_image_selector_imagecomment' => true,
+				//'frontend_image_selector_imagelink' => true,
+				//'frontend_image_selector_imagealign' => true,
+				//'frontend_image_selector_imagesize' => true,
+				//'frontend_image_selector_hiddenfields' => true,
+				//'frontend_image_selector' => true,
 				'backend_image_add' => true,
 				'backend_image_addHotlink' => true,
 				'backend_image_addform' => true,
@@ -87,6 +87,7 @@ class serendipity_event_aws extends serendipity_event
         }
 
 				$conf_array[] = 'using_aws_s3';
+				$conf_array[] = 'aws_cache_only';
 				$conf_array[] = 'aws_key';
 				$conf_array[] = 'aws_secret_key';
 				$conf_array[] = 'aws_account_id';
@@ -106,6 +107,12 @@ class serendipity_event_aws extends serendipity_event
 				case 'using_aws_s3':
 					$propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_ON);
 					$propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_ON_DESC);
+					$propbag->add('default',        'true');
+					$propbag->add('type',           'boolean');
+				break;
+				case 'aws_cache_only':
+					$propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY);
+					$propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY_DESC);
 					$propbag->add('default',        'true');
 					$propbag->add('type',           'boolean');
 				break;
@@ -192,26 +199,26 @@ class serendipity_event_aws extends serendipity_event
 						break;
 						
 						case 'backend_image_add':
-							$full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
-							$target_img = $eventData;
-							
-							preg_match('@(^.*/)+(.*)\.+(\w*)@',$target_img, $matches);
-              $target_dir   = $matches[1];
-              $basename     = $matches[2];
-              $extension    = $matches[3];
-              $filename     = $basename.".".$extension;
-							#$thumbname  	= $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
-							$target_thm 	= $target_dir . $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
-							
-							$fp_length = strlen($full_path);
-							$rel_filename = substr($target_img, $fp_length);
-							$rel_thumbname = substr($target_thm, $fp_length);
-							
-							$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
-              
-							// only if AmazonS3 class is loaded and radio button for s3 is selected
+							// only burn cycles if AmazonS3 class is loaded and radio button for s3 is selected
 							if ((class_exists('AmazonS3')) && ($serendipity['POST']['using_aws_s3'] == YES)) {
-
+								
+								$full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
+								$target_img = $eventData;
+							
+								preg_match('@(^.*/)+(.*)\.+(\w*)@',$target_img, $matches);
+              	$target_dir   = $matches[1];
+              	$basename     = $matches[2];
+              	$extension    = $matches[3];
+              	$filename     = $basename.".".$extension;
+								#$thumbname  	= $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
+								$target_thm 	= $target_dir . $basename . "." . $serendipity['thumbSuffix'] . "." . $extension;
+							
+								$fp_length = strlen($full_path);
+								$rel_filename = substr($target_img, $fp_length);
+								$rel_thumbname = substr($target_thm, $fp_length);
+							
+								$authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
+              
 								// get config information
 								$aws_key 				= $this->get_config('aws_key');
 								$aws_secret_key = $this->get_config('aws_secret_key');
@@ -235,74 +242,113 @@ class serendipity_event_aws extends serendipity_event
 										'storage'				=> AmazonS3::STORAGE_REDUCED
 									));
 									
-									
-									$upload_log = "Full Path: " .						$full_path . "\n" . 
-																"Full Filename: " . 			$target_img . "\n" .
-																"Relative Filename: " . 	$rel_filename . "\n" . 
-																"Full Thumbname: " .			$target_thm . "\n" .
-																"Relative Thumbname: " . 	$rel_thumbname . "\n" .
-																"Target Dir: " . 					$target_dir . "\n";
-								
-									// list all props in serendipity
-									foreach ($serendipity as $key=>$value) {
-										$upload_log = $upload_log . "\n" . $key . ":" . $value;
-									}
-								
-								 // upload log b/c it's an easy way to see what's going on
-									$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
-										'body' => $upload_log,
-										'contentType' => 'text/plain',
-										'acl' => AmazonS3::ACL_PUBLIC,
-										'storage' => AmazonS3::STORAGE_REDUCED
-									));
+									//// TESTING -- WRITE OUT A LOG TO S3
+									//// start creating log file for testing
+									//$upload_log = "Full Path: " .						$full_path . "\n" . 
+									//							"Full Filename: " . 			$target_img . "\n" .
+									//							"Relative Filename: " . 	$rel_filename . "\n" . 
+									//							"Full Thumbname: " .			$target_thm . "\n" .
+									//							"Relative Thumbname: " . 	$rel_thumbname . "\n" .
+									//							"Target Dir: " . 					$target_dir . "\n";
+								  //
+									//// list all props in serendipity
+									//foreach ($serendipity as $key=>$value) {
+									//	$upload_log = $upload_log . "\n" . $key . ":" . $value;
+									//}
+								  //
+								  //// upload log b/c it's an easy way to see what's going on
+									//$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
+									//	'body' => $upload_log,
+									//	'contentType' => 'text/plain',
+									//	'acl' => AmazonS3::ACL_PUBLIC,
+									//	'storage' => AmazonS3::STORAGE_REDUCED
+									//));
 									
 									echo PLUGIN_EVENT_AWS_UPLOAD_SUCCESS;
 									
 								} else {
 									echo PLUGIN_EVENT_AWS_UPLOAD_FAILED;
 								}
-								
 							}	
 						break;
 						
-            case 'frontend_display':
-
-            	foreach ($this->markup_elements as $temp) {
-                	if (serendipity_db_bool($this->get_config($temp['name'], true)) && isset($eventData[$temp['element']])) {
-                    	$element = $temp['element'];
+						case 'frontend_display':
+							// only burn cycles if aws is enabled...
+							if ($this->get_config('using_aws_s3')) {
+								foreach ($this->markup_elements as $temp) {
+									if (serendipity_db_bool($this->get_config($temp['name'], true)) && isset($eventData[$temp['element']])) {
+											$element = $temp['element'];
 											$bucket  = $this->get_config('aws_s3_bucket_name');
 											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
 											
-                    	$eventData[$element] = $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
-                	}
-            	}
-
+											$eventData[$element] = $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
+										}
+									}
+								}
             	return true;
-
-           	break;
+						break;
 
 						default:
 							return false;
-					}	
-			} else {
+						}	
+				} else {
 				return false;
 			}
 		}
 		
-		// munge text and replace img src with s3 
+		// munge text and replace s9ymdb stuff with s3 links
 		function _s9y_aws_munge($text, $uploadHTTPPath, $bucket) {
-
+	
+			// set amazon url + bucket name
+			$amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
+			
 			// Cleanup slashes for regex
 			$uploadHTTPPath = str_replace('/','\/', $uploadHTTPPath);
 
-			$pattern = '/' . $uploadHTTPPath . '/';
-			$replace = "https://s3.amazonaws.com/$bucket/";
-		
+			// look for media coming from s9y media database containing upload patch
+			$pattern = '/(s9ymdb.*)' . $uploadHTTPPath . '/';
+			$replace = '$1' . $amazonurl . '/';
+			
+			// munge!!
 			$text = preg_replace($pattern, $replace, $text); 
-
+			
+			// TESTNG
+			//$bucket_list = $this->_s9y_get_s3_list();
+			//$text = $text . ' STUFF IN THE BUCKET: ' . $bucket_list;
+			
 			return $text;
 
-    }
+		}
+
+		// get a list of stuff in the bucket
+		function _s9y_get_s3_list() {
+			
+			if ((class_exists('AmazonS3')) && ($this->get_config('using_aws_s3'))) {
+				// get config information
+				$aws_key 				= $this->get_config('aws_key');
+				$aws_secret_key = $this->get_config('aws_secret_key');
+				$bucket 				= $this->get_config('aws_s3_bucket_name');
+			
+				$s3 = new AmazonS3($aws_key, $aws_secret_key);
+				
+				// check the bucket exists
+				if ($s3->if_bucket_exists($bucket)) {
+					
+					$response = $s3->get_object_list($bucket);
+					
+					// make a string for testing -- should really return ARRAY!
+					foreach($response as $e) {
+		          $r = $r . '<BR/>' . $e;
+		      }
+		
+				}
+				
+			}
+			
+			// resturn the string list of stuff in the bucket
+			// probably want to return an ARRAY!
+			return $r;
+		}
 }
 
 ?>

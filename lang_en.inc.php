@@ -15,7 +15,7 @@
 @define('PLUGIN_EVENT_AWS_PROP_AWS_SECRET_KEY',     			'Amazon Web Services Secret Key.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_SECRET_KEY_DESC',    	'Found in the AWS Security Credentials.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_ACCOUNT_ID',     			'Amazon Account ID without dashes.');
-@define('PLUGIN_EVENT_AWS_PROP_AWS_ACCOUNT_ID_DESC',    	'Used for identification with Amazon EC2. Found in the AWS Security Credentials.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_ACCOUNT_ID_DESC',    	'Used for identification with Amazon EC2. Found in the AWS Security Credentials (Currently Unused).');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_ID',     		'Your CanonicalUser ID.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_ID_DESC',    'Used for setting access control settings in AmazonS3. Found in the AWS Security Credentials.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_NAME',    		'Your CanonicalUser DisplayName.');
@@ -27,4 +27,6 @@
 @define('PLUGIN_EVENT_AWS_UPLOAD_FILES_DESC',							'Should we upload image to S3?');
 @define('PLUGIN_EVENT_AWS_UPLOAD_SUCCESS',								'Upload to AWS S3 succeeded.');
 @define('PLUGIN_EVENT_AWS_UPLOAD_FAILED',									'Upload to AWS S3 failed.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY',						'Enable Cache Only Mode');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY_DESC',			'In Cache Only mode, we will keep a local list of what\'s in s3 and vend only those items.  Avoids need to sync.');
 ?>
