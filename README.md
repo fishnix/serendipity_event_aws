@@ -12,6 +12,7 @@ This is nowhere near complete, so if you stumble upon it, don't use it.
 	*	Utility to check for out of sync repository
 	* 	Swap out links/src to local files with those at S3 on demand per site
 	*	Swap out links/src to local files with those at S3 on demand per entry
+	*	Setup cache only mode so sync doesn't have to happen
 	
 ##What you will need to use this plugin:
 	* AWS Account
@@ -31,6 +32,5 @@ I have a couple reasons...
 	* Job to sync files from local repo to S3
 	* Job to check sync of files
 	* Job to sync files from S3 to local repo?
-	* Harden code to swap out img src (it's really dumb right now)
 	* Make sure uploads are confirmed, check return codes, etc
 	* Add config option for enable/disable per post?
