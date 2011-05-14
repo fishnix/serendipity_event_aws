@@ -334,6 +334,7 @@ class serendipity_event_aws extends serendipity_event
 		}
 
 		// get a list of stuff in the bucket
+		// this might need to be async + dropped into DB at some point
 		function _s9y_get_s3_list() {
 			
 			if ((class_exists('AmazonS3')) && ($this->get_config('using_aws_s3'))) {
@@ -347,6 +348,7 @@ class serendipity_event_aws extends serendipity_event
 				// check the bucket exists
 				if ($s3->if_bucket_exists($bucket)) {
 					
+					// get the object list from s3
 					$response = $s3->get_object_list($bucket);
 					
 					#// make a string for testing -- should really return ARRAY!
@@ -357,9 +359,7 @@ class serendipity_event_aws extends serendipity_event
 				
 			}
 			
-			// resturn the string list of stuff in the bucket
-			// probably want to return an ARRAY!
-			#return $r;
+			// return the array of items in the response
 			return $response;
 		}
 }

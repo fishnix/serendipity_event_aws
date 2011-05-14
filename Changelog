@@ -1,4 +1,16 @@
 
+20110514 ECF
+ * pull list of objects from AWS + return array
+   * This will need to be stored somewhere and probably asynchronous to perform
+ * Started search + replace work for cache-only mode
+   * Currently builds a pattern + replacement array and replaces corresponding pattern in text
+ * I think we can add efficiency by doing:
+   - an asynchronous load of the pattern/replace into memcache (or DB)
+   - config option to say how often to refresh memcache pattern/replace
+   - each request check a variable for the last time memcache was reloaded
+     - if < refreshInterval ago, use the one we have
+     - if > refreshInterval ago, refresh then resume processing
+
 20110323 ECF
  * Introduced on "Cache only" mode to avoid having to get sync code working immediately, probably
    more compelling to most people anyways.
