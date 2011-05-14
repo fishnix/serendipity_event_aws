@@ -24,13 +24,15 @@ I have a couple reasons...
 	* Cloud is cool
 	* S3 is scalable, redundant storage
 	* S3 for media allows me to use the cloudfront cdn on bursty days
-	* S3 for media removes one of two things that make a local instance of s9y "special".  (DB is the other)  Using cfg mgmt (chef), I can deploy a s9y server on demand, and with a few quick clicks (literally) have the site up and running
+	* S3 for media removes one of two things that make a local instance of s9y "special".  
+	(DB is the other)  Using cfg mgmt (chef), I can deploy a s9y server on demand, and with a few 
+	quick clicks (literally) have the site up and running
 	
 	
 ##Todo
 
 	* Job to sync files from local repo to S3
 	* Job to check sync of files
-	* Job to sync files from S3 to local repo?
+	* Job to sync files from S3 to local repo? (need to go both ways if sites are portable)
 	* Make sure uploads are confirmed, check return codes, etc
 	* Add config option for enable/disable per post?
