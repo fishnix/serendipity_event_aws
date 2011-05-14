@@ -35,7 +35,7 @@ class serendipity_event_aws extends serendipity_event
         $propbag->add('description',  PLUGIN_EVENT_AWS_DESC);
         $propbag->add('stackable',    false);
         $propbag->add('groups', 			array('IMAGES'));
-        $propbag->add('author',       'E Camden Fisher');
+        $propbag->add('author',       'E Camden Fisher <fish@fishnix.net>');
         $propbag->add('version',      '0.0.1');
         $propbag->add('requirements', array(
             'serendipity' => '1.5.0',
@@ -280,12 +280,14 @@ class serendipity_event_aws extends serendipity_event
 											$element = $temp['element'];
 											$bucket  = $this->get_config('aws_s3_bucket_name');
 											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
+											$bucket_list = $this->_s9y_get_s3_list();
 											
-											$text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
+											$text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket, $bucket_list);
 											
 											// TESTNG
-											//$bucket_list = $this->_s9y_get_s3_list();
-											///$text = $text . ' STUFF IN THE BUCKET: ' . $bucket_list;
+											foreach ($bucket_list as $e) {
+												$text = $text . ' STUFF IN THE BUCKET: ' . $e . "\n";
+											}
 											
 											$eventData[$element] = $text;		
 											
@@ -304,20 +306,28 @@ class serendipity_event_aws extends serendipity_event
 		}
 		
 		// munge text and replace s9ymdb stuff with s3 links
-		function _s9y_aws_munge($text, $uploadHTTPPath, $bucket) {
+		function _s9y_aws_munge($text, $uploadHTTPPath, $bucket, $bucket_list) {
 	
 			// set amazon url + bucket name
 			$amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
 			
-			// Cleanup slashes for regex
-			$uploadHTTPPath = str_replace('/','\/', $uploadHTTPPath);
-
-			// look for media coming from s9y media database containing upload patch
-			$pattern = '/(s9ymdb.*)' . $uploadHTTPPath . '/';
-			$replace = '$1' . $amazonurl . '/';
+			// create an array of patterns and replaces
+			$pattern_list = array();
+			$replace_list = array();
+			foreach($bucket_list as $i) {
+				$r  = '$1' . $amazonurl . '/' . $i;
+				array_push($replace_list, $r);
+				
+				$p = '(s9ymdb.*)' . $uploadHTTPPath . $i;
+				$p = str_replace('/','\/', $p);
+				$p = '/' . $p . '/';
+				array_push($pattern_list, $p);
+				
+				#$text = $text . "Pattern: $p  REPLACE: $r \n";
+			}
 			
-			// munge!!
-			$text = preg_replace($pattern, $replace, $text); 
+			// munge!  note: we are passing 2 arrays here as $pattern_list + $replace_list
+			$text = preg_replace($pattern_list, $replace_list, $text);
 			
 			return $text;
 
@@ -339,18 +349,18 @@ class serendipity_event_aws extends serendipity_event
 					
 					$response = $s3->get_object_list($bucket);
 					
-					// make a string for testing -- should really return ARRAY!
-					foreach($response as $e) {
-		          $r = $r . '<BR/>' . $e;
-		      }
-		
+					#// make a string for testing -- should really return ARRAY!
+					#foreach($response as $e) {
+		      #    $r = $r . '<BR/>' . $e;
+		      #}
 				}
 				
 			}
 			
 			// resturn the string list of stuff in the bucket
 			// probably want to return an ARRAY!
-			return $r;
+			#return $r;
+			return $response;
 		}
 }
 
