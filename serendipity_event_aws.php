@@ -62,7 +62,8 @@ class serendipity_event_aws extends serendipity_event
 				'backend_image_add' => true,
 				'backend_image_addHotlink' => true,
 				'backend_image_addform' => true,
-				'frontend_display' => true
+				'frontend_display' => true,
+				'backend_preview' => true
 				));
 
       $this->markup_elements = array(
@@ -272,6 +273,7 @@ class serendipity_event_aws extends serendipity_event
 							}	
 						break;
 						
+						case 'backend_preview':
 						case 'frontend_display':
 							// only burn cycles if aws is enabled...
 							if ($this->get_config('using_aws_s3')) {
@@ -280,14 +282,17 @@ class serendipity_event_aws extends serendipity_event
 											$element = $temp['element'];
 											$bucket  = $this->get_config('aws_s3_bucket_name');
 											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
+											
+											// get the list of items in the bucket 
+											// TODO: needs to be async + stored, should be call to cache or DB
 											$bucket_list = $this->_s9y_get_s3_list();
 											
 											$text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket, $bucket_list);
 											
 											// TESTNG
-											foreach ($bucket_list as $e) {
-												$text = $text . ' STUFF IN THE BUCKET: ' . $e . "\n";
-											}
+											//foreach ($bucket_list as $e) {
+											//	$text = $text . ' STUFF IN THE BUCKET: ' . $e . "\n";
+											//}
 											
 											$eventData[$element] = $text;		
 											
@@ -306,36 +311,55 @@ class serendipity_event_aws extends serendipity_event
 		}
 		
 		// munge text and replace s9ymdb stuff with s3 links
+		// need to workout entry caching
 		function _s9y_aws_munge($text, $uploadHTTPPath, $bucket, $bucket_list) {
 	
 			// set amazon url + bucket name
 			$amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
 			
-			// create an array of patterns and replaces
-			$pattern_list = array();
-			$replace_list = array();
-			foreach($bucket_list as $i) {
-				$r  = '$1' . $amazonurl . '/' . $i;
-				array_push($replace_list, $r);
+			// if we are in cache only mode, just replace what we've got in s3
+			if ($this->get_config('aws_cache_only')){
+				// create an array of patterns and replaces
+				$pattern_list = array();
+				$replace_list = array();
 				
-				$p = '(s9ymdb.*)' . $uploadHTTPPath . $i;
-				$p = str_replace('/','\/', $p);
-				$p = '/' . $p . '/';
-				array_push($pattern_list, $p);
+				foreach($bucket_list as $i) {
+					$r  = '$1' . $amazonurl . '/' . $i;
+					array_push($replace_list, $r);
 				
-				#$text = $text . "Pattern: $p  REPLACE: $r \n";
+					$p = '(s9ymdb.*)' . $uploadHTTPPath . $i;
+					$p = str_replace('/','\/', $p);
+					$p = '/' . $p . '/';
+					array_push($pattern_list, $p);
+				
+					// Testing
+					#$text = $text . "Pattern: $p  REPLACE: $r \n";
+				}
+			
+				// munge!  note: we are passing 2 arrays here
+				$text = preg_replace($pattern_list, $replace_list, $text);
+
+			} else { // otherwise replace all s9y media db stuff
+				$pattern = '(s9ymdb.*)' . $uploadHTTPPath;
+				$pattern = str_replace('/','\/', $pattern);
+				$pattern = '/' . $pattern . '/';
+				
+				$replace = '$1' . $amazonurl . '/';
+				
+				$text = preg_replace($pattern, $replace, $text);
 			}
 			
-			// munge!  note: we are passing 2 arrays here as $pattern_list + $replace_list
-			$text = preg_replace($pattern_list, $replace_list, $text);
-			
+			// return munged text
 			return $text;
 
 		}
 
 		// get a list of stuff in the bucket
-		// this might need to be async + dropped into DB at some point
+		// this should be called async + dropped into DB/memcache
 		function _s9y_get_s3_list() {
+			
+			// set response to empty array
+			$response = array();
 			
 			if ((class_exists('AmazonS3')) && ($this->get_config('using_aws_s3'))) {
 				// get config information
@@ -344,17 +368,11 @@ class serendipity_event_aws extends serendipity_event
 				$bucket 				= $this->get_config('aws_s3_bucket_name');
 			
 				$s3 = new AmazonS3($aws_key, $aws_secret_key);
-				
+								
 				// check the bucket exists
 				if ($s3->if_bucket_exists($bucket)) {
-					
 					// get the object list from s3
 					$response = $s3->get_object_list($bucket);
-					
-					#// make a string for testing -- should really return ARRAY!
-					#foreach($response as $e) {
-		      #    $r = $r . '<BR/>' . $e;
-		      #}
 				}
 				
 			}

@@ -2,7 +2,7 @@
 
 This is a plugin to interface the [*serendipity blog platform*](http://www.s9y.org/) with Amazon Web Services.
 
-This is nowhere near complete, so if you stumble upon it, don't use it.
+This is not complete, so if you stumble upon it, use at your own risk.
 
 ##Initial goals are:
 
@@ -12,7 +12,7 @@ This is nowhere near complete, so if you stumble upon it, don't use it.
 	*	Utility to check for out of sync repository
 	* 	Swap out links/src to local files with those at S3 on demand per site
 	*	Swap out links/src to local files with those at S3 on demand per entry
-	*	Setup cache only mode so sync doesn't have to happen
+	*	Cache only mode so sync doesn't have to happen (s9y "knows" what objects are in S3)
 	
 ##What you will need to use this plugin:
 	* AWS Account
@@ -31,6 +31,8 @@ I have a couple reasons...
 	
 ##Todo
 
+	* Workout entry caching for entries munged with S3 links
+	* Build S3 object list asychronously + store in DB with Memcache option
 	* Job to sync files from local repo to S3
 	* Job to check sync of files
 	* Job to sync files from S3 to local repo? (need to go both ways if sites are portable)

@@ -1,4 +1,8 @@
 
+20110515 ECF
+ * separate what happens in cache-only mode versus full mode
+ * handle backend_preview
+
 20110514 ECF
  * pull list of objects from AWS + return array
    * This will need to be stored somewhere and probably asynchronous to perform
