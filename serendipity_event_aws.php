@@ -43,6 +43,10 @@ class serendipity_event_aws extends serendipity_event
             'php'         => '5.2.0'
         ));
 
+			// make it cacheable
+			$propbag->add('cachable_events', array(
+						'frontend_display' => true));
+						
 			$propbag->add('event_hooks',   array(
 				//entries_header' => true,
 				//entry_display' => true,
