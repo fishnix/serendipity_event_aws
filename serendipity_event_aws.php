@@ -175,6 +175,42 @@ class serendipity_event_aws extends serendipity_event
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
     }
 		
+		function cleanup() {
+        global $serendipity;
+    
+				// check AWS S3 class is loaded
+				if (class_exists('AmazonS3')) {
+					
+					// If AWS S3 is disabled
+					if (!$this->get_config('using_aws_s3')) {
+						$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_DISABLED));
+					}
+					
+					// get config information
+					$aws_key 				= $this->get_config('aws_key');
+					$aws_secret_key = $this->get_config('aws_secret_key');
+					$bucket 				= $this->get_config('aws_s3_bucket_name');
+
+					$s3 = new AmazonS3($aws_key, $aws_secret_key);
+					
+					// check the bucket exists
+					if ($s3->if_bucket_exists($bucket)) {
+						$this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_VERIFIED . ": $bucket/" . $s3->get_bucket_object_count($bucket)));
+					} else {
+						$this->outputMSG('notice', sprintf(PLUGIN_EVENT_AWS_BAD_BUCKET_OR_CREDS));
+						return false;
+					}
+						
+				} else {
+					$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_MISSING_LIBS));
+					return false;
+				}
+				
+				// we should rebuild the cache if we change configs (?)
+				serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
+        serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
+    }
+		
     function event_hook($event, &$bag, &$eventData) {
         global $serendipity;
 				
@@ -288,7 +324,7 @@ class serendipity_event_aws extends serendipity_event
 											$uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
 											
 											// get the list of items in the bucket 
-											// TODO: needs to be async + stored, should be call to cache or DB
+											// TODO: needs to be async + stored, should be call to cache or DB not load all into mem
 											$bucket_list = $this->_s9y_get_s3_list();
 											
 											$text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket, $bucket_list);
@@ -384,6 +420,23 @@ class serendipity_event_aws extends serendipity_event
 			// return the array of items in the response
 			return $response;
 		}
+		
+		function outputMSG($status, $msg) {
+        switch($status) {
+            case 'notice':
+                echo '<div class="serendipityAdminMsgNotice"><img style="width: 22px; height: 22px; border: 0px; padding-right: 4px; vertical-align: middle" src="' . serendipity_getTemplateFile('admin/img/admin_msg_note.png') . '" alt="" />' . $msg . '</div>' . "\n";
+                break;
+
+            case 'error':
+                echo '<div class="serendipityAdminMsgError"><img style="width: 22px; height: 22px; border: 0px; padding-right: 4px; vertical-align: middle" src="' . serendipity_getTemplateFile('admin/img/admin_msg_error.png') . '" alt="" />' . $msg . '</div>' . "\n";
+                break;
+
+            default:
+            case 'success':
+                echo '<div class="serendipityAdminMsgSuccess"><img style="height: 22px; width: 22px; border: 0px; padding-right: 4px; vertical-align: middle" src="' . serendipity_getTemplateFile('admin/img/admin_msg_success.png') . '" alt="" />' . $msg . '</div>' . "\n";
+                break;
+        }
+    }
 }
 
 ?>

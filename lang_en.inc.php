@@ -29,4 +29,8 @@
 @define('PLUGIN_EVENT_AWS_UPLOAD_FAILED',									'Upload to AWS S3 failed.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY',						'Enable Cache Only Mode');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY_DESC',			'In Cache Only mode, we will keep a local list of what\'s in s3 and vend only those items.  Avoids need to sync.');
+@define('PLUGIN_EVENT_AWS_BAD_BUCKET_OR_CREDS',						'Bucket doesnt exist or bad creds');
+@define('PLUGIN_EVENT_AWS_MISSING_LIBS',									'Problem loading AmazonS3 library!');
+@define('PLUGIN_EVENT_AWS_DISABLED',											'AWS Disabled!');
+@define('PLUGIN_EVENT_AWS_VERIFIED',											'Verified bucket (Name/Items)');
 ?>
