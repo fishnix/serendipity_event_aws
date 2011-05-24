@@ -167,6 +167,7 @@ class serendipity_event_aws extends serendipity_event
     }
     
     function install() {
+				$this->setupDB();
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
     }
 
@@ -205,11 +206,70 @@ class serendipity_event_aws extends serendipity_event
           $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_MISSING_LIBS));
           return false;
         }
+
+				// ensure the DB is setup when we save config
+				$this->setupDB();
+				
+				// rebuild the aws item cache on config save
+				$this->purgeCache();
+				$this->buildCache();
         
-        // we should rebuild the cache if we change configs (?)
+        // we should rebuild the cache if we change configs
         serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
+
     }
+
+		/*
+		 * Purge the object list cache
+		 */
+		function purgeCache()
+		{
+				global $serendipity;
+				
+				serendipity_db_query("truncate {$serendipity['dbPrefix']}aws_objectlist");
+		}
+		
+		/*
+		 * Build the object list cache
+		 */
+		function buildCache()
+		{
+				global $serendipity;
+				
+				$values = array();
+				foreach ($this->_s9y_get_s3_list() as $file) { 
+					$f = serendipity_db_escape_string($file);
+					$values = array(
+						'object' => $f,
+						'timestamp' => time(),
+						'last_modified' => time()
+					);
+					serendipity_db_insert('aws_objectlist', $values);
+				}
+
+		}
+
+		/*
+		 * Setup the DB
+		 */
+    function setupDB()
+    {
+        global $serendipity;
+
+        $built = $this->get_config('aws_db_built', null);
+        if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
+            serendipity_db_schema_import("CREATE TABLE {$serendipity['dbPrefix']}aws_objectlist (
+                    id {AUTOINCREMENT} {PRIMARY},
+                    object varchar(255) not null default '',
+                    timestamp int(10) {UNSIGNED} default null,
+                    last_modified int(10) {UNSIGNED} default null) {UTF_8}");
+
+            $this->set_config('aws_db_built', '1');
+            @define('AWSDB_SETUP_DONE', true);
+        }
+    }
+
     
     function event_hook($event, &$bag, &$eventData) {
         global $serendipity;
@@ -322,18 +382,8 @@ class serendipity_event_aws extends serendipity_event
                       $element = $temp['element'];
                       $bucket  = $this->get_config('aws_s3_bucket_name');
                       $uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
-                      
-                      // get the list of items in the bucket 
-                      // TODO: needs to be async + stored, should be call to cache or DB not load all into mem
-                      $bucket_list = $this->_s9y_get_s3_list();
-                      
-                      $text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket, $bucket_list);
-                      
-                      // TESTNG
-                      //foreach ($bucket_list as $e) {
-                      //  $text = $text . ' STUFF IN THE BUCKET: ' . $e . "\n";
-                      //}
-                      
+      
+                      $text =  $this->_s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket);
                       $eventData[$element] = $text;   
                       
                     }
@@ -350,10 +400,12 @@ class serendipity_event_aws extends serendipity_event
       }
     }
     
-    // munge text and replace s9ymdb stuff with s3 links
-    // need to workout entry caching
-    function _s9y_aws_munge($text, $uploadHTTPPath, $bucket, $bucket_list) {
-  
+		/*
+     *	munge text and replace s9ymdb stuff with s3 links
+		 */
+    function _s9y_aws_munge($text, $uploadHTTPPath, $bucket) {
+  		global $serendipity;
+
       // set amazon url + bucket name
       $amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
       
@@ -362,24 +414,29 @@ class serendipity_event_aws extends serendipity_event
         // create an array of patterns and replaces
         $pattern_list = array();
         $replace_list = array();
-        
+
+				// incremental changes... will make this better asap
+ 				$bucket_list = serendipity_db_query("SELECT object FROM {$serendipity['dbPrefix']}aws_objectlist");
+				
         foreach($bucket_list as $i) {
-          $r  = '$1' . $amazonurl . '/' . $i;
+					$object = $i['object'];
+	
+          $r  = '$1' . $amazonurl . '/' . $object;
           array_push($replace_list, $r);
         
-          $p = '(s9ymdb.*)' . $uploadHTTPPath . $i;
+          $p = '(s9ymdb.*)' . $uploadHTTPPath . $object;
           $p = str_replace('/','\/', $p);
           $p = '/' . $p . '/';
           array_push($pattern_list, $p);
-        
-          // Testing
-          #$text = $text . "Pattern: $p  REPLACE: $r \n";
+
+					 // Testing
+					#$text = $text . "Pattern: $p  REPLACE: $r \n";
         }
       
         // munge!  note: we are passing 2 arrays here
         $text = preg_replace($pattern_list, $replace_list, $text);
 
-      } else { // otherwise replace all s9y media db stuff
+      } else {   // otherwise replace all s9y media db stuff
         $pattern = '(s9ymdb.*)' . $uploadHTTPPath;
         $pattern = str_replace('/','\/', $pattern);
         $pattern = '/' . $pattern . '/';
@@ -394,8 +451,9 @@ class serendipity_event_aws extends serendipity_event
 
     }
 
-    // get a list of stuff in the bucket
-    // this should be called async + dropped into DB/memcache
+		/*
+     * Get a list of stuff in the bucket
+		 */
     function _s9y_get_s3_list() {
       
       // set response to empty array
