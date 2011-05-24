@@ -365,6 +365,8 @@ class serendipity_event_aws extends serendipity_event
                   //  'storage' => AmazonS3::STORAGE_REDUCED
                   //));
                   
+									// TODO: insert new image into DB!
+
                   echo PLUGIN_EVENT_AWS_UPLOAD_SUCCESS;
                   
                 } else {
