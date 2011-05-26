@@ -1,6 +1,13 @@
 
+20110525 ECF
+ * Broke out s3 upload into function
+ * made regex search for objects in entries a little better
+ * Added object list storage mech selection
+ * Added rudimentary file based object list store
+
 20110523 ECF
  * Started rolling DB support for object list
+ * Purge/Build list of objects in s3 on plugin config save (instead of on each entry munge!)
 
 20110515 ECF
  * separate what happens in cache-only mode versus full mode

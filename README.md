@@ -4,18 +4,22 @@ This is a plugin to interface the [*serendipity blog platform*](http://www.s9y.o
 
 This is not complete, so if you stumble upon it, use at your own risk.
 
-##Initial goals are:
+##Goals are:
 
-	* 	Make plugin easily configurable via standard configuration interface
-	*	Upload files to S3 when uploading to media manager
+	* 	Make plugin easily configurable via standard configuration interface (DONE)
+	*	Upload files to S3 when uploading to media manager (DONE)
 	*	Sync all medea from local media manager to S3
 	*	Utility to check for out of sync repository
-	* 	Swap out links/src to local files with those at S3 on demand per site
-	*	Swap out links/src to local files with those at S3 on demand per entry
-	*	Cache only mode so sync doesn't have to happen (s9y "knows" what objects are in S3)
+	* 	Swap out links/src to local files with those at S3 on demand per site (DONE)
+	*	Swap out links/src to local files with those at S3 on demand per entry (Maybe WONTDO)
+	*	Cache only mode so sync doesn't have to happen (s9y "knows" what objects are in S3) (DONE)
+	*	Enable query of local object list via DB
+	*	Enable query of local object list via Memcahe or faster means than DB (MAYBE - entryproperties caches entries already)
+	*	Support Rackspace cloudfiles
 	
 ##What you will need to use this plugin:
 	* AWS Account
+	* serendipity_event_entryproperties plugin
 
 ##Why?
 
@@ -31,7 +35,6 @@ I have a couple reasons...
 	
 ##Todo
 
-	* Workout entry caching for entries munged with S3 links
 	* Build S3 object list asychronously + store in DB with Memcache option
 	* Job to sync files from local repo to S3
 	* Job to check sync of files

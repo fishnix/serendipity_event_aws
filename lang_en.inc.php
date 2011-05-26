@@ -33,4 +33,8 @@
 @define('PLUGIN_EVENT_AWS_MISSING_LIBS',									'Problem loading AmazonS3 library!');
 @define('PLUGIN_EVENT_AWS_DISABLED',											'AWS Disabled!');
 @define('PLUGIN_EVENT_AWS_VERIFIED',											'Verified bucket (Name/Items)');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH',			'Object List Storage Mechanism');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH_DESC', 'Mechanis to use for storing the object list.  None is SLOW and fetches list everytime it builds an entry.');
+@define('PLUGIN_EVENT_AWS_WROTE_CACHE_FILE',							'Wrote object list cache file.');
+@define('PLUGIN_EVENT_AWS_WROTE_CACHE_DB', 								'Wrote object list cache to database.')
 ?>
