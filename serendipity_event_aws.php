@@ -48,21 +48,21 @@ class serendipity_event_aws extends serendipity_event
             'frontend_display' => true));
             
       $propbag->add('event_hooks',   array(
-        //'entries_header' => true,
-        //'entry_display' => true,
-        //'backend_entry_presave' => true,
-        //'backend_publish' => true,
-        //'backend_save' => true,
-        //'frontend_image_add_unknown' => true,
-        //'frontend_image_add_filenameonly' => true,
-        //'frontend_image_selector_submit' => true,
-        //'frontend_image_selector_more' => true,
-        //'frontend_image_selector_imagecomment' => true,
-        //'frontend_image_selector_imagelink' => true,
-        //'frontend_image_selector_imagealign' => true,
-        //'frontend_image_selector_imagesize' => true,
-        //'frontend_image_selector_hiddenfields' => true,
-        //'frontend_image_selector' => true,
+        /*'entries_header' => true,
+        'entry_display' => true,
+        'backend_entry_presave' => true,
+        'backend_publish' => true,
+        'backend_save' => true,
+        'frontend_image_add_unknown' => true,
+        'frontend_image_add_filenameonly' => true,
+        'frontend_image_selector_submit' => true,
+        'frontend_image_selector_more' => true,
+        'frontend_image_selector_imagecomment' => true,
+        'frontend_image_selector_imagelink' => true,
+        'frontend_image_selector_imagealign' => true,
+        'frontend_image_selector_imagesize' => true,
+        'frontend_image_selector_hiddenfields' => true,
+        'frontend_image_selector' => true, */
         'backend_image_add' => true,
         'backend_image_addHotlink' => true,
         'backend_image_addform' => true,
@@ -176,16 +176,48 @@ class serendipity_event_aws extends serendipity_event
       return true;
     }
     
+    /*
+     *
+     * install plugin
+     *
+     */
     function install() {
 				$this->setupDB();
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
     }
 
+    /*
+     *
+     * uninstall plugin
+     *
+     */
     function uninstall() {
         serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
     }
     
+		/*
+		 *
+		 * Setup the DB
+		 *
+		 */
+    function setupDB()
+    {
+        global $serendipity;
+
+        $built = $this->get_config('aws_db_built', null);
+        if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
+            serendipity_db_schema_import("CREATE TABLE {$serendipity['dbPrefix']}aws_objectlist (
+                    id {AUTOINCREMENT} {PRIMARY},
+                    object varchar(255) not null default '' {INDEX},
+                    timestamp int(10) {UNSIGNED} default null,
+                    last_modified int(10) {UNSIGNED} default null) {UTF_8}");
+
+            $this->set_config('aws_db_built', '1');
+            @define('AWSDB_SETUP_DONE', true);
+        }
+    }
+
     function cleanup() {
         global $serendipity;
     
@@ -195,6 +227,7 @@ class serendipity_event_aws extends serendipity_event
           // If AWS S3 is disabled
           if (!$this->get_config('using_aws_s3')) {
             $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_DISABLED));
+            return false;
           }
           
           // get config information
@@ -274,11 +307,11 @@ class serendipity_event_aws extends serendipity_event
 				global $serendipity;
 				
 				$i = $this->get_config('aws_objlist_mech');
+				
 				$mechlist = $this->get_objlist_mech();
 				switch($mechlist[$i]) {
 					case 'none':
-						// nothin' to do!
-						// really! it's loaded everytime frontend_display is called
+						/* nothin' to do! */
 					break;
 				
 					case 'database':
@@ -302,19 +335,13 @@ class serendipity_event_aws extends serendipity_event
 						
 						if (is_array($objects)) {
 						
-							$fp = @fopen($objcache, 'w');
+							$result = file_put_contents($objcache, implode("\n",$objects), LOCK_EX);
 
-            	if (!$fp) {
-                	$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
-                	return $error;
-            	}
-
-            	fwrite($fp, implode("\n",$objects));
-            	fclose($fp);
-
-            	#$this->fileperm($target, false);
-
-            	$this->outputMSG('success', PLUGIN_EVENT_AWS_WROTE_CACHE_FILE);
+							if ($result) {
+								$this->outputMSG('success', PLUGIN_EVENT_AWS_WROTE_CACHE_FILE);
+							} else {
+								$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
+							}
 						} else {
 							$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
 						}
@@ -323,27 +350,6 @@ class serendipity_event_aws extends serendipity_event
 				}
 		}
 
-		/*
-		 * Setup the DB
-		 */
-    function setupDB()
-    {
-        global $serendipity;
-
-        $built = $this->get_config('aws_db_built', null);
-        if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
-            serendipity_db_schema_import("CREATE TABLE {$serendipity['dbPrefix']}aws_objectlist (
-                    id {AUTOINCREMENT} {PRIMARY},
-                    object varchar(255) not null default '',
-                    timestamp int(10) {UNSIGNED} default null,
-                    last_modified int(10) {UNSIGNED} default null) {UTF_8}");
-
-            $this->set_config('aws_db_built', '1');
-            @define('AWSDB_SETUP_DONE', true);
-        }
-    }
-
-    
     function event_hook($event, &$bag, &$eventData) {
         global $serendipity;
         
@@ -392,14 +398,21 @@ class serendipity_event_aws extends serendipity_event
               
                 $authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
 
+								$aws_key = $this->get_config('aws_key');
+								$aws_secret_key = $this->get_config('aws_secret_key');
+								$aws_s3_bucket_name = $this->get_config('aws_s3_bucket_name');
+								
 								// upload image + thumb
-								$this->s9y_aws_upload($this->get_config('aws_key'), $this->get_config('aws_secret_key'), $this->get_config('aws_s3_bucket_name'), $rel_filename, $target_image);
-              	$this->s9y_aws_upload($this->get_config('aws_key'), $this->get_config('aws_secret_key'), $this->get_config('aws_s3_bucket_name'), $rel_filename, $target_thm);
-              
-              	echo PLUGIN_EVENT_AWS_UPLOAD_SUCCESS;
-                  
+								$result1 = $this->s9y_aws_upload($aws_key, $aws_secret_key, $aws_s3_bucket_name, $rel_filename, $target_image);
+              	$result2 = $this->s9y_aws_upload($aws_key, $aws_secret_key, $aws_s3_bucket_name, $rel_thumbname, $target_thm);
+
+								if ($result1 && $result2) {
+                	$this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_UPLOAD_SUCCESS));
+								} else {
+									$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED));
+								}
                } else {
-                  echo PLUGIN_EVENT_AWS_UPLOAD_FAILED;
+								$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED));
                }
             break;
    
@@ -448,33 +461,69 @@ class serendipity_event_aws extends serendipity_event
           'storage'       => AmazonS3::STORAGE_REDUCED
         ));
 
-    	}
-				// TODO: insert new image into DB!
-				// TODO: check upload response!
+				$validate = $s3->if_object_exists($bucket, $rel_filename);
+				if ($validate) {
+					$this->add_object_to_cache($rel_filename);
+					return true;
+				} else {
+					return false;
+				}
 
-			return('success');
+    	}
+
+			return(false);
 			
-        //// TESTING -- WRITE OUT A LOG TO S3
-        //// start creating log file for testing
-        //$upload_log = "Full Path: " .           $full_path . "\n" . 
-        //              "Full Filename: " .       $target_img . "\n" .
-        //              "Relative Filename: " .   $rel_filename . "\n" . 
-        //              "Full Thumbname: " .      $target_thm . "\n" .
-        //              "Relative Thumbname: " .  $rel_thumbname . "\n" .
-        //              "Target Dir: " .          $target_dir . "\n";
-        //
-        //// list all props in serendipity
-        //foreach ($serendipity as $key=>$value) {
-        //  $upload_log = $upload_log . "\n" . $key . ":" . $value;
-        //}
-        //
-        //// upload log b/c it's an easy way to see what's going on
-        //$createresponse = $s3->create_object($bucket, 'upload-log.txt', array(
-        //  'body' => $upload_log,
-        //  'contentType' => 'text/plain',
-        //  'acl' => AmazonS3::ACL_PUBLIC,
-        //  'storage' => AmazonS3::STORAGE_REDUCED
-        //));      
+		}
+
+		/*
+		 *
+		 * Add item to cache when uploading
+		 *
+		 */
+		function add_object_to_cache($filename) {
+			
+			global $serendipity;
+			
+			$i = $this->get_config('aws_objlist_mech');
+			
+			$mechlist = $this->get_objlist_mech();
+			$result = "";
+			switch($mechlist[$i]) {
+				case 'none':
+					/* nothin' to do! */
+				break;
+			
+				case 'database':
+					$values = array();
+					
+					$f = serendipity_db_escape_string($filename);
+					$query = "SELECT id FROM {$serendipity['dbPrefix']}aws_objectlist WHERE object like '$f'";
+					$id = serendipity_db_query($query , true);
+					
+					$value = array(
+						'object' => $f,
+						'timestamp' => time(),
+						'last_modified' => time()
+						);
+					
+					if ($id) {
+						$result = serendipity_db_update('aws_objectlist', array('id' => $id), $value);
+						$this->outputMSG('notice', 'ADDED OBJECTS TO CACHE ' .$id);
+					}	else {
+						$result = serendipity_db_insert('aws_objectlist', $value);
+					}
+
+				break;
+				
+				case 'file':
+					$objcache = 'templates_c/foobar.txt';
+					
+					$result = file_put_contents($objcache, $filename, FILE_APPEND | LOCK_EX);
+					
+					break;
+				}
+			
+			return($result);
 		}
 
 		/*
@@ -485,16 +534,15 @@ class serendipity_event_aws extends serendipity_event
     function s9y_aws_munge($text, $uploadHTTPPath, $bucket, $cacheonly, $objlist_mech) {
   		global $serendipity;
 
-      // set amazon url + bucket name
+      /* set amazon url + bucket name */
       $amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
       
-      // if we are in cache only mode, just replace what we've got in s3
+      /* if we are in cache only mode, just replace what we've got in s3 */
       if ($cacheonly){
-        // create an array of patterns and replaces
+        /* create an array of patterns and replaces */
         $pattern_list = array();
         $replace_list = array();
 
-				#$i = $this->get_config('aws_objlist_mech');
 				$mechlist = $this->get_objlist_mech();
 				switch($mechlist[$objlist_mech]) {
 					case 'none':
@@ -513,7 +561,7 @@ class serendipity_event_aws extends serendipity_event
 					break;
 					
 					case 'database':
-						// incremental changes... will make this better 
+						/* incremental changes... will make this better */
  						$bucket_list = serendipity_db_query("SELECT object FROM {$serendipity['dbPrefix']}aws_objectlist");
 
 		        foreach($bucket_list as $i) {
@@ -545,14 +593,15 @@ class serendipity_event_aws extends serendipity_event
 		         	$p = '/' . $p . '/';
 		         	array_push($pattern_list, $p);
 		
-							// Testing
-							#$text = $text . "Pattern: $p  REPLACE: $r \n";
+							/* Testing
+							$text = $text . "Pattern: $p  REPLACE: $r \n";
+							*/
 		        }
 					break;
 					
 				}
       
-        // munge!  note: we are passing 2 arrays here
+        /* munge!  note: we are passing 2 arrays here */
         $text = preg_replace($pattern_list, $replace_list, $text);
 
       } else {   // otherwise replace all s9y media db stuff
