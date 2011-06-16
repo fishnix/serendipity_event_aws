@@ -1,4 +1,11 @@
 
+20110615 ECF
+ * Simplified messages + methods
+ * Upload method should be able to upload multiple objects, now it can
+
+20110613 ECF
+ * Started cache update on media upload
+
 20110525 ECF
  * Broke out s3 upload into function
  * made regex search for objects in entries a little better

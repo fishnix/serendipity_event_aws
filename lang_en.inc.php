@@ -35,8 +35,6 @@
 @define('PLUGIN_EVENT_AWS_VERIFIED',											'Verified bucket (Name/Items)');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH',			'Object List Storage Mechanism');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH_DESC', 'Mechanis to use for storing the object list.  None is SLOW and fetches list everytime it builds an entry.');
-@define('PLUGIN_EVENT_AWS_WROTE_CACHE_FILE',							'Wrote object list cache file.');
-@define('PLUGIN_EVENT_AWS_FAILED_CACHE_FILE',							'Failed to write object list cache file.');
-@define('PLUGIN_EVENT_AWS_WROTE_CACHE_DB', 								'Wrote object list cache to database.');
-@define('PLUGIN_EVENT_AWS_FAILED_CACHE_DB', 							'Failed to write object list cache to database.');
+@define('PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS',          'Successfully updated object cache.');
+@define('PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE',          'Failed to update object cache.');
 ?>

@@ -1,7 +1,11 @@
 <?php 
 
-// AWS Plugin for Serendipity
-// 20110212 by E Camden Fisher <fishnix@gmail.com>
+/*
+
+    AWS Plugin for Serendipity
+    E. Camden Fisher <fishnix@gmail.com>
+    
+*/
 
 if (IN_serendipity != true) {
     die ("Don't hack!"); 
@@ -307,8 +311,8 @@ class serendipity_event_aws extends serendipity_event
 				global $serendipity;
 				
 				$i = $this->get_config('aws_objlist_mech');
-				
 				$mechlist = $this->get_objlist_mech();
+				
 				switch($mechlist[$i]) {
 					case 'none':
 						/* nothin' to do! */
@@ -326,7 +330,7 @@ class serendipity_event_aws extends serendipity_event
 							serendipity_db_insert('aws_objectlist', $values);
 						}
 						
-						$this->outputMSG('success', PLUGIN_EVENT_AWS_WROTE_CACHE_DB);
+						$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);
 					break;
 					
 					case 'file':
@@ -338,11 +342,13 @@ class serendipity_event_aws extends serendipity_event
 							$result = file_put_contents($objcache, implode("\n",$objects), LOCK_EX);
 
 							if ($result) {
-								$this->outputMSG('success', PLUGIN_EVENT_AWS_WROTE_CACHE_FILE);
+								$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);
 							} else {
+							  $this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
 								$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
 							}
 						} else {
+						  $this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
 							$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
 						}
 						
@@ -397,23 +403,36 @@ class serendipity_event_aws extends serendipity_event
                 $rel_thumbname = substr($target_thm, $fp_length);
               
                 $authorid   = (isset($serendipity['POST']['all_authors']) && $serendipity['POST']['all_authors'] == 'true') ? '0' : $serendipity['authorid'];
-
-								$aws_key = $this->get_config('aws_key');
-								$aws_secret_key = $this->get_config('aws_secret_key');
-								$aws_s3_bucket_name = $this->get_config('aws_s3_bucket_name');
 								
-								// upload image + thumb
-								$result1 = $this->s9y_aws_upload($aws_key, $aws_secret_key, $aws_s3_bucket_name, $rel_filename, $target_image);
-              	$result2 = $this->s9y_aws_upload($aws_key, $aws_secret_key, $aws_s3_bucket_name, $rel_thumbname, $target_thm);
+								/*
+              	$this->outputMSG('notice', sprintf("target_image: $target_img"));
+              	$this->outputMSG('notice', sprintf("target_thumb: $target_thm"));
+                */
+								
+								$uploads = array( $rel_filename => $target_img,
+								                  $rel_thumbname => $target_thm );
 
-								if ($result1 && $result2) {
-                	$this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_UPLOAD_SUCCESS));
+								// upload image + thumb
+								$validate = $this->s9y_aws_upload($uploads);
+								
+								if (is_array($validate)) {
+								  foreach ($validate as $object => $success) {
+								    if ($success) {
+								      $this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_UPLOAD_SUCCESS . " $object"));
+								      $this->add_object_to_cache($object);
+								    } else {
+								      $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED . " $object"));
+								    }
+								  }
 								} else {
-									$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED));
+								  $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED . " $object"));
 								}
-               } else {
-								$this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED));
-               }
+                
+              } else {
+							  $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED));
+              }
+              
+              return true;
             break;
    
             case 'backend_preview':
@@ -423,12 +442,8 @@ class serendipity_event_aws extends serendipity_event
                 foreach ($this->markup_elements as $temp) {
                   if (serendipity_db_bool($this->get_config($temp['name'], true)) && isset($eventData[$temp['element']])) {
                       $element = $temp['element'];
-                      $bucket  = $this->get_config('aws_s3_bucket_name');
                       $uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
-      
-                      $text =  $this->s9y_aws_munge($eventData[$element], $uploadHTTPPath, $bucket, $this->get_config('aws_cache_only'), $this->get_config('aws_objlist_mech'));
-                      $eventData[$element] = $text;   
-                      
+                      $eventData[$element] =  $this->s9y_aws_munge($eventData[$element], $uploadHTTPPath);
                     }
                   }
                 }
@@ -445,39 +460,45 @@ class serendipity_event_aws extends serendipity_event
     
 		/*
 		 *
-		 * Do Upload to S3
+		 * Upload to S3
 		 *
 		 */
-		function s9y_aws_upload($aws_key, $aws_secret_key, $bucket, $rel_filename, $target_obj) {
+		function s9y_aws_upload(array $uploads) {
+		  
+			$aws_key = $this->get_config('aws_key');
+			$aws_secret_key = $this->get_config('aws_secret_key');
+			$bucket = $this->get_config('aws_s3_bucket_name');
 			
 			$s3 = new AmazonS3($aws_key, $aws_secret_key);
 
       if ($s3->if_bucket_exists($bucket)) {
       
-        // upload image to amazon s3                
-        $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
-          'fileUpload'    => $target_obj,
-          'acl'           => AmazonS3::ACL_PUBLIC,
-          'storage'       => AmazonS3::STORAGE_REDUCED
-        ));
-
-				$validate = $s3->if_object_exists($bucket, $rel_filename);
-				if ($validate) {
-					$this->add_object_to_cache($rel_filename);
-					return true;
-				} else {
-					return false;
-				}
-
+        $validate = array();
+        foreach ($uploads as $rel_filename => $target_obj) {
+          // upload image to amazon s3                
+          $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
+            'fileUpload'    => $target_obj,
+            'acl'           => AmazonS3::ACL_PUBLIC,
+            'storage'       => AmazonS3::STORAGE_REDUCED
+            ));
+            
+            if ($s3->if_object_exists($bucket, $rel_filename)) {
+              $validate[$rel_filename] = true;
+  				  } else {
+  				    $validate[$rel_filename] = false;
+  				  }
+    	  }
+    	  
+    	  return $validate;
     	}
-
-			return(false);
+    	
+			return null;
 			
 		}
 
 		/*
 		 *
-		 * Add item to cache when uploading
+		 * Add item to cache
 		 *
 		 */
 		function add_object_to_cache($filename) {
@@ -508,17 +529,20 @@ class serendipity_event_aws extends serendipity_event
 					
 					if ($id) {
 						$result = serendipity_db_update('aws_objectlist', array('id' => $id), $value);
-						$this->outputMSG('notice', 'ADDED OBJECTS TO CACHE ' .$id);
 					}	else {
 						$result = serendipity_db_insert('aws_objectlist', $value);
 					}
-
+          // TODO: add validation of cache update
+          $this->outputMSG('notice', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);		
 				break;
 				
 				case 'file':
 					$objcache = 'templates_c/foobar.txt';
 					
 					$result = file_put_contents($objcache, $filename, FILE_APPEND | LOCK_EX);
+					
+					// TODO: add validation of cache update
+					$this->outputMSG('notice', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);
 					
 					break;
 				}
@@ -531,18 +555,19 @@ class serendipity_event_aws extends serendipity_event
      *	munge text and replace s9ymdb stuff with s3 links
 		 *
 		 */
-    function s9y_aws_munge($text, $uploadHTTPPath, $bucket, $cacheonly, $objlist_mech) {
+    function s9y_aws_munge($text, $uploadHTTPPath) {
   		global $serendipity;
 
       /* set amazon url + bucket name */
-      $amazonurl = 'https://s3.amazonaws.com' . '/' . $bucket;
+      $amazonurl = 'https://s3.amazonaws.com' . '/' . $this->get_config('aws_s3_bucket_name');
       
       /* if we are in cache only mode, just replace what we've got in s3 */
-      if ($cacheonly){
+      if ($this->get_config('aws_cache_only')){
         /* create an array of patterns and replaces */
         $pattern_list = array();
         $replace_list = array();
 
+        $objlist_mech = $this->get_config('aws_objlist_mech');
 				$mechlist = $this->get_objlist_mech();
 				switch($mechlist[$objlist_mech]) {
 					case 'none':
