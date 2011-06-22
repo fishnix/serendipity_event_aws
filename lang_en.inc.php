@@ -37,4 +37,6 @@
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH_DESC', 'Mechanis to use for storing the object list.  None is SLOW and fetches list everytime it builds an entry.');
 @define('PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS',          'Successfully updated object cache.');
 @define('PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE',          'Failed to update object cache.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME',       'Cache file name for object list.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME_DESC',  'File saved in templates_c/ used to cache object list. Default should be fine.');
 ?>

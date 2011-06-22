@@ -12,7 +12,7 @@ if (IN_serendipity != true) {
 }
     
 $time_start = microtime(true);
-require_once 'sdk-1.2.3/sdk.class.php';
+require_once 'sdk-1.3.5/sdk.class.php';
 
 // Probe for a language include with constants. Still include defines later on, if some constants were missing
 $probelang = dirname(__FILE__) . '/' . $serendipity['charset'] . 'lang_' . $serendipity['lang'] . '.inc.php';
@@ -171,6 +171,12 @@ class serendipity_event_aws extends serendipity_event
           $propbag->add('select_values', 	$this->get_objlist_mech());
           $propbag->add('default',     		0);
         break;
+        case 'aws_cachefile_name':
+          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME);
+          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME_DESC);
+          $propbag->add('default', 'aws_cache');
+          $propbag->add('type', 'string');
+        break;
         default:
           return false;
         break;
@@ -289,7 +295,8 @@ class serendipity_event_aws extends serendipity_event
 		{
 				global $serendipity;
 				
-				$objcache = 'templates_c/foobar.txt';
+				$cachefile = $this->get_config('aws_cachefile_name');
+				$objcache = 'templates_c/' . $cachefile;
 				if (is_writeable($objcache) && is_file($objcache)) { 
 					unlink($objcache); 
 				} elseif (!is_writeable($objcache) && is_file($objcache)){ 
@@ -335,7 +342,8 @@ class serendipity_event_aws extends serendipity_event
 					
 					case 'file':
 						$objects = $this->s9y_get_s3_list();
-						$objcache = 'templates_c/foobar.txt';
+						$cachefile = $this->get_config('aws_cachefile_name');
+						$objcache = 'templates_c/' . $cachefile;
 						
 						if (is_array($objects)) {
 						
@@ -537,7 +545,8 @@ class serendipity_event_aws extends serendipity_event
 				break;
 				
 				case 'file':
-					$objcache = 'templates_c/foobar.txt';
+				  $cachefile = $this->get_config('aws_cachefile_name');
+					$objcache = 'templates_c/' . $cachefile;
 					
 					$result = file_put_contents($objcache, $filename, FILE_APPEND | LOCK_EX);
 					
@@ -604,7 +613,8 @@ class serendipity_event_aws extends serendipity_event
 					break;
 					
 					case 'file':
-						$target = 'templates_c/foobar.txt';
+					  $cachefile = $this->get_config('aws_cachefile_name');
+						$target = 'templates_c/' . $cachefile;
 						$bucket_list = file($target);
 						
 						foreach($bucket_list as $i) {
