@@ -1,4 +1,11 @@
 
+20121220 ECF
+ * Upgraded to sdk v1.5.17.1
+ * Corrected for _construct changes in SDK
+ * Default to "Cache Only" mode to false
+ * Added S3 Storage type options
+ * Only build caching mechs when cache is enabled
+
 20110615 ECF
  * Simplified messages + methods
  * Upload method should be able to upload multiple objects, now it can

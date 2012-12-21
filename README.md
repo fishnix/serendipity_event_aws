@@ -4,6 +4,8 @@ This is a plugin to interface the [*serendipity blog platform*](http://www.s9y.o
 
 This is not complete, so if you stumble upon it, use at your own risk.
 
+*It is recommended that you use a tool like s3cmd to keep your media in sync.*
+
 ##Goals are:
 
 	* 	Make plugin easily configurable via standard configuration interface (DONE)

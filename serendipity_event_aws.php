@@ -12,7 +12,7 @@ if (IN_serendipity != true) {
 }
     
 $time_start = microtime(true);
-require_once 'sdk-1.3.5/sdk.class.php';
+require_once 'sdk-1.5.17.1/sdk.class.php';
 
 // Probe for a language include with constants. Still include defines later on, if some constants were missing
 $probelang = dirname(__FILE__) . '/' . $serendipity['charset'] . 'lang_' . $serendipity['lang'] . '.inc.php';
@@ -103,6 +103,7 @@ class serendipity_event_aws extends serendipity_event
         $conf_array[] = 'aws_canonical_id';
         $conf_array[] = 'aws_canonical_name';
         $conf_array[] = 'aws_s3_bucket_name';
+        $conf_array[] = 'aws_s3_storage_type';
 				$conf_array[] = 'aws_objlist_mech';
 
         $propbag->add('configuration', $conf_array);
@@ -123,7 +124,7 @@ class serendipity_event_aws extends serendipity_event
         case 'aws_cache_only':
           $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY);
           $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_CACHE_ONLY_DESC);
-          $propbag->add('default',        'true');
+          $propbag->add('default',        'false');
           $propbag->add('type',           'boolean');
         break;
         case 'aws_key':
@@ -162,9 +163,14 @@ class serendipity_event_aws extends serendipity_event
           $propbag->add('default', '');
           $propbag->add('type', 'string');
         break;
+        case 'aws_s3_storage_type':
+          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_STORAGE_TYPE);
+          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_STORAGE_TYPE_DESC);
+          $propbag->add('type',        		'select');
+          $propbag->add('select_values', 	$this->get_s3_storage_types());
+          $propbag->add('default',     		0);
+        break;
         case 'aws_objlist_mech':
-					$options = $this->get_objlist_mech();
-
           $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH);
           $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_OBJLIST_MECH_DESC);
           $propbag->add('type',        		'select');
@@ -187,9 +193,7 @@ class serendipity_event_aws extends serendipity_event
     }
     
     /*
-     *
      * install plugin
-     *
      */
     function install() {
 				$this->setupDB();
@@ -197,9 +201,7 @@ class serendipity_event_aws extends serendipity_event
     }
 
     /*
-     *
      * uninstall plugin
-     *
      */
     function uninstall() {
         serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
@@ -207,9 +209,7 @@ class serendipity_event_aws extends serendipity_event
     }
     
 		/*
-		 *
 		 * Setup the DB
-		 *
 		 */
     function setupDB()
     {
@@ -217,16 +217,29 @@ class serendipity_event_aws extends serendipity_event
 
         $built = $this->get_config('aws_db_built', null);
         if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
-            serendipity_db_schema_import("CREATE TABLE {$serendipity['dbPrefix']}aws_objectlist (
-                    id {AUTOINCREMENT} {PRIMARY},
-                    object varchar(255) not null default '' {INDEX},
-                    timestamp int(10) {UNSIGNED} default null,
-                    last_modified int(10) {UNSIGNED} default null) {UTF_8}");
-
+            #$this->outputMSG('notice', sprintf("Trying to setup DB! " . $serendipity['dbPrefix'] . "aws_objectlist"));
+            
+            $q = "CREATE TABLE IF NOT EXISTS {$serendipity['dbPrefix']}aws_objectlist (
+                  id {AUTOINCREMENT} {PRIMARY},
+                  object varchar(255) not null default 0,
+                  timestamp int(10) {UNSIGNED} default null,
+                  last_modified int(10) {UNSIGNED} default null,
+                  INDEX(object)) {UTF_8}";
+            
+            #$this->outputMSG('notice', sprintf("Executing " . $q));
+            
+            $sql = serendipity_db_schema_import($q);
+            
+            #$this->outputMSG('notice', sprintf("Output " . $sql));
+            
             $this->set_config('aws_db_built', '1');
             @define('AWSDB_SETUP_DONE', true);
         }
     }
+    
+    /*
+     * Called when plugin config is saved
+     */
 
     function cleanup() {
         global $serendipity;
@@ -237,15 +250,22 @@ class serendipity_event_aws extends serendipity_event
           // If AWS S3 is disabled
           if (!$this->get_config('using_aws_s3')) {
             $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_DISABLED));
+            
+            // make sure the object list caches are purged if we are disabled
+            $this->purgeCache();
+            
+            // we should rebuild the cache if we change configs
+            serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
+            serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
+            
             return false;
           }
           
           // get config information
-          $aws_key        = $this->get_config('aws_key');
-          $aws_secret_key = $this->get_config('aws_secret_key');
           $bucket         = $this->get_config('aws_s3_bucket_name');
-
-          $s3 = new AmazonS3($aws_key, $aws_secret_key);
+          $awsopts = array( "key" => $this->get_config('aws_key'),
+                            "secret" => $this->get_config('aws_secret_key'));
+          $s3 = new AmazonS3($awsopts);
           
           // check the bucket exists
           if ($s3->if_bucket_exists($bucket)) {
@@ -260,12 +280,14 @@ class serendipity_event_aws extends serendipity_event
           return false;
         }
 
-				// ensure the DB is setup when we save config
-				$this->setupDB();
+        if ($this->get_config('aws_cache_only')) {
+				  // ensure the DB is setup when we save config
+				  $this->setupDB();
 				
-				// rebuild the aws item cache on config save
-				$this->purgeCache();
-				$this->buildCache();
+				  // rebuild the aws item cache on config save
+				  $this->purgeCache();
+				  $this->buildCache();
+			  }
         
         // we should rebuild the cache if we change configs
         serendipity_plugin_api::hook_event('backend_cache_purge', $this->title);
@@ -274,14 +296,20 @@ class serendipity_event_aws extends serendipity_event
     }
 
 		/*
-		 *
 		 * Get list of mechanisms for object list -- we can check available libs, etc here
-		 *
 		 */
 		function get_objlist_mech()
 		{
 			$mechs = array('database', 'file', 'none');
-			
+			return($mechs);
+		}
+		
+		/*
+		 * Get list of storage types for s3 -- we can check available libs, etc here
+		 */
+		function get_s3_storage_types()
+		{
+			$mechs = array('REDUCED_REDUNDANCY', 'STANDARD');
 			return($mechs);
 		}
 
@@ -427,7 +455,10 @@ class serendipity_event_aws extends serendipity_event
 								  foreach ($validate as $object => $success) {
 								    if ($success) {
 								      $this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_UPLOAD_SUCCESS . " $object"));
-								      $this->add_object_to_cache($object);
+								      // add to cache only if we are in cache-only mode
+								      if ($this->get_config('aws_cache_only')) {
+								        $this->add_object_to_cache($object);
+							        }
 								    } else {
 								      $this->outputMSG('error', sprintf(PLUGIN_EVENT_AWS_UPLOAD_FAILED . " $object"));
 								    }
@@ -473,28 +504,44 @@ class serendipity_event_aws extends serendipity_event
 		 */
 		function s9y_aws_upload(array $uploads) {
 		  
-			$aws_key = $this->get_config('aws_key');
-			$aws_secret_key = $this->get_config('aws_secret_key');
 			$bucket = $this->get_config('aws_s3_bucket_name');
-			
-			$s3 = new AmazonS3($aws_key, $aws_secret_key);
+      $awsopts = array( "key" => $this->get_config('aws_key'),
+                        "secret" => $this->get_config('aws_secret_key'));
+      $s3 = new AmazonS3($awsopts);
 
       if ($s3->if_bucket_exists($bucket)) {
       
         $validate = array();
         foreach ($uploads as $rel_filename => $target_obj) {
-          // upload image to amazon s3                
-          $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
-            'fileUpload'    => $target_obj,
-            'acl'           => AmazonS3::ACL_PUBLIC,
-            'storage'       => AmazonS3::STORAGE_REDUCED
-            ));
+          
+          $i = $this->get_config('aws_s3_storage_type');
+  				$storagetype = $this->get_s3_storage_types();
+
+  				switch($storagetype[$i]) {
+  					case 'REDUCED_REDUNDANCY':
+              // upload image to amazon s3                
+              $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
+                'fileUpload'    => $target_obj,
+                'acl'           => AmazonS3::ACL_PUBLIC,
+                'storage'       => AmazonS3::STORAGE_REDUCED
+              )); 
+            break;
+  					case 'STANDARD':
+    					// upload image to amazon s3                
+              $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
+                'fileUpload'    => $target_obj,
+                'acl'           => AmazonS3::ACL_PUBLIC,
+                'storage'       => AmazonS3::STORAGE_STANDARD
+              )); 
+                
+  					break;
+					}
             
-            if ($s3->if_object_exists($bucket, $rel_filename)) {
-              $validate[$rel_filename] = true;
-  				  } else {
-  				    $validate[$rel_filename] = false;
-  				  }
+          if ($s3->if_object_exists($bucket, $rel_filename)) {
+            $validate[$rel_filename] = true;
+				  } else {
+				    $validate[$rel_filename] = false;
+				  }
     	  }
     	  
     	  return $validate;
@@ -664,11 +711,11 @@ class serendipity_event_aws extends serendipity_event
       
       if ((class_exists('AmazonS3')) && ($this->get_config('using_aws_s3'))) {
         // get config information
-        $aws_key        = $this->get_config('aws_key');
-        $aws_secret_key = $this->get_config('aws_secret_key');
         $bucket         = $this->get_config('aws_s3_bucket_name');
       
-        $s3 = new AmazonS3($aws_key, $aws_secret_key);
+        $awsopts = array( "key" => $this->get_config('aws_key'),
+                          "secret" => $this->get_config('aws_secret_key'));
+        $s3 = new AmazonS3($awsopts);
                 
         // check the bucket exists
         if ($s3->if_bucket_exists($bucket)) {
