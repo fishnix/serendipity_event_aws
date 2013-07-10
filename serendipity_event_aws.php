@@ -103,6 +103,7 @@ class serendipity_event_aws extends serendipity_event
         $conf_array[] = 'aws_canonical_id';
         $conf_array[] = 'aws_canonical_name';
         $conf_array[] = 'aws_s3_bucket_name';
+        $conf_array[] = 'aws_s3_bucket_subdir';
         $conf_array[] = 'aws_s3_storage_type';
 				$conf_array[] = 'aws_objlist_mech';
 
@@ -161,6 +162,12 @@ class serendipity_event_aws extends serendipity_event
           $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME);
           $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME_DESC);
           $propbag->add('default', '');
+          $propbag->add('type', 'string');
+        break;
+        case 'aws_s3_bucket_subdir':
+          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_SUBDIR);
+          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_SUBDIR_DESC);
+          $propbag->add('default', '/');
           $propbag->add('type', 'string');
         break;
         case 'aws_s3_storage_type':

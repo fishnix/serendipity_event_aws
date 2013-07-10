@@ -22,10 +22,12 @@
 @define('PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_NAME_DESC',  'Used for setting access control settings in AmazonS3. Found in the AWS Security Credentials.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME',				'AWS S3 Bucket Name.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_NAME_DESC',	'Name of the Simple Storage Service bucket to put your bits in.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_SUBDIR',			'AWS S3 Subdirectory');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_S3_BUCKET_SUBDIR_DESC',		'Subdirectory inside the S3 bucket to look for images (default: /).');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_STORAGE_TYPE',			'Type of Storage.');
 @define('PLUGIN_EVENT_AWS_PROP_AWS_S3_STORAGE_TYPE_DESC',	'Storage Redundancy. Only effects newly added media. Standard is more costly than Reduced.');
-@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME',       'Cache file name for object list.');
-@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME_DESC',  'File saved in templates_c/ used to cache object list. Default should be fine.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME',     	'Cache file name for object list.');
+@define('PLUGIN_EVENT_AWS_PROP_AWS_CACHEFILE_NAME_DESC',	'File saved in templates_c/ used to cache object list. Default should be fine.');
 @define('PLUGIN_EVENT_AWS_INSTALL', 											'<P><strong>This is an experimental plugin.  I can\'t promise you won\'t lose all of your data.</strong>');
 @define('PLUGIN_EVENT_AWS_UPLOAD_FILES',									'Upload files to Amazon S3');
 @define('PLUGIN_EVENT_AWS_UPLOAD_FILES_DESC',							'Should we upload image to S3?');
