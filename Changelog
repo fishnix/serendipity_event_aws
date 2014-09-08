@@ -1,4 +1,7 @@
 
+20140908 ECF
+ * Upgraded to sdk v2.6.15
+
 20121220 ECF
  * Upgraded to sdk v1.5.17.1
  * Corrected for _construct changes in SDK

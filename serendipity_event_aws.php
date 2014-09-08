@@ -12,7 +12,8 @@ if (IN_serendipity != true) {
 }
     
 $time_start = microtime(true);
-require_once 'sdk-1.5.17.1/sdk.class.php';
+require_once 'sdk-2.6.15/aws-autoloader.php';
+use Aws\S3\S3Client;
 
 // Probe for a language include with constants. Still include defines later on, if some constants were missing
 $probelang = dirname(__FILE__) . '/' . $serendipity['charset'] . 'lang_' . $serendipity['lang'] . '.inc.php';
@@ -40,7 +41,7 @@ class serendipity_event_aws extends serendipity_event
         $propbag->add('stackable',    false);
         $propbag->add('groups',       array('IMAGES'));
         $propbag->add('author',       'E Camden Fisher <fish@fishnix.net>');
-        $propbag->add('version',      '0.0.2');
+        $propbag->add('version',      '0.1.0');
         $propbag->add('requirements', array(
             'serendipity' => '1.5.0',
             'smarty'      => '2.6.7',
@@ -99,9 +100,6 @@ class serendipity_event_aws extends serendipity_event
         $conf_array[] = 'aws_cache_only';
         $conf_array[] = 'aws_key';
         $conf_array[] = 'aws_secret_key';
-        $conf_array[] = 'aws_account_id';
-        $conf_array[] = 'aws_canonical_id';
-        $conf_array[] = 'aws_canonical_name';
         $conf_array[] = 'aws_s3_bucket_name';
         $conf_array[] = 'aws_s3_bucket_subdir';
         $conf_array[] = 'aws_s3_storage_type';
@@ -137,24 +135,6 @@ class serendipity_event_aws extends serendipity_event
         case 'aws_secret_key':
           $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_SECRET_KEY);
           $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_SECRET_KEY_DESC);
-          $propbag->add('default', '');
-          $propbag->add('type', 'string');
-        break;
-        case 'aws_account_id':
-          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_ACCOUNT_ID);
-          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_ACCOUNT_ID_DESC);
-          $propbag->add('default', '');
-          $propbag->add('type', 'string');
-        break;
-        case 'aws_canonical_id':
-          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_ID);
-          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_ID_DESC);
-          $propbag->add('default', '');
-          $propbag->add('type', 'string');
-        break;
-        case 'aws_canonical_name':
-          $propbag->add('name',           PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_NAME);
-          $propbag->add('description',    PLUGIN_EVENT_AWS_PROP_AWS_CANONICAL_NAME_DESC);
           $propbag->add('default', '');
           $propbag->add('type', 'string');
         break;
@@ -215,44 +195,14 @@ class serendipity_event_aws extends serendipity_event
         serendipity_plugin_api::hook_event('backend_cache_entries', $this->title);
     }
     
-		/*
-		 * Setup the DB
-		 */
-    function setupDB()
-    {
-        global $serendipity;
-
-        $built = $this->get_config('aws_db_built', null);
-        if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
-            #$this->outputMSG('notice', sprintf("Trying to setup DB! " . $serendipity['dbPrefix'] . "aws_objectlist"));
-            
-            $q = "CREATE TABLE IF NOT EXISTS {$serendipity['dbPrefix']}aws_objectlist (
-                  id {AUTOINCREMENT} {PRIMARY},
-                  object varchar(255) not null default 0,
-                  timestamp int(10) {UNSIGNED} default null,
-                  last_modified int(10) {UNSIGNED} default null,
-                  INDEX(object)) {UTF_8}";
-            
-            #$this->outputMSG('notice', sprintf("Executing " . $q));
-            
-            $sql = serendipity_db_schema_import($q);
-            
-            #$this->outputMSG('notice', sprintf("Output " . $sql));
-            
-            $this->set_config('aws_db_built', '1');
-            @define('AWSDB_SETUP_DONE', true);
-        }
-    }
-    
     /*
      * Called when plugin config is saved
      */
-
     function cleanup() {
         global $serendipity;
     
         // check AWS S3 class is loaded
-        if (class_exists('AmazonS3')) {
+        if (class_exists('Aws\S3\Command\S3Command')) {
           
           // If AWS S3 is disabled
           if (!$this->get_config('using_aws_s3')) {
@@ -272,11 +222,14 @@ class serendipity_event_aws extends serendipity_event
           $bucket         = $this->get_config('aws_s3_bucket_name');
           $awsopts = array( "key" => $this->get_config('aws_key'),
                             "secret" => $this->get_config('aws_secret_key'));
-          $s3 = new AmazonS3($awsopts);
+                            
+          // Instantiate the S3 client with your AWS credentials
+          $s3 = S3Client::factory($awsopts);
           
           // check the bucket exists
-          if ($s3->if_bucket_exists($bucket)) {
-            $this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_VERIFIED . ": $bucket/" . $s3->get_bucket_object_count($bucket)));
+          if ($s3->doesBucketExist($bucket)) {
+            $bpath = $bucket . $this->get_config('aws_s3_bucket_subdir');
+            $this->outputMSG('success', sprintf(PLUGIN_EVENT_AWS_VERIFIED . " ($bpath)"));
           } else {
             $this->outputMSG('notice', sprintf(PLUGIN_EVENT_AWS_BAD_BUCKET_OR_CREDS));
             return false;
@@ -302,6 +255,35 @@ class serendipity_event_aws extends serendipity_event
 
     }
 
+		/*
+		 * Setup the DB
+		 */
+    function setupDB()
+    {
+        global $serendipity;
+
+        $built = $this->get_config('aws_db_built', null);
+        if ((empty($built)) && (!defined('AWSDB_SETUP_DONE'))) {
+            $this->outputMSG('notice', sprintf("Trying to setup DB! " . $serendipity['dbPrefix'] . "aws_objectlist"));
+            
+            $q = "CREATE TABLE IF NOT EXISTS {$serendipity['dbPrefix']}aws_objectlist (
+                  id {AUTOINCREMENT} {PRIMARY},
+                  object varchar(255) not null default 0,
+                  timestamp int(10) {UNSIGNED} default null,
+                  last_modified int(10) {UNSIGNED} default null,
+                  INDEX(object)) {UTF_8}";
+            
+            $this->outputMSG('notice', sprintf("Executing " . $q));
+            
+            $sql = serendipity_db_schema_import($q);
+            
+            $this->outputMSG('notice', sprintf("Output " . $sql));
+            
+            $this->set_config('aws_db_built', '1');
+            @define('AWSDB_SETUP_DONE', true);
+        }
+    }
+    
 		/*
 		 * Get list of mechanisms for object list -- we can check available libs, etc here
 		 */
@@ -351,7 +333,6 @@ class serendipity_event_aws extends serendipity_event
 		function buildCache()
 		{
 				global $serendipity;
-				
 				$i = $this->get_config('aws_objlist_mech');
 				$mechlist = $this->get_objlist_mech();
 				
@@ -360,41 +341,98 @@ class serendipity_event_aws extends serendipity_event
 						/* nothin' to do! */
 					break;
 				
-					case 'database':
-						$values = array();
-						foreach ($this->s9y_get_s3_list() as $file) { 
-							$f = serendipity_db_escape_string($file);
-							$values = array(
-								'object' => $f,
-								'timestamp' => time(),
-								'last_modified' => time()
-							);
-							serendipity_db_insert('aws_objectlist', $values);
+					case 'database':            
+			      if ((class_exists('Aws\S3\Command\S3Command')) && ($this->get_config('using_aws_s3'))) {
+			        // get config information
+			        $bucket = $this->get_config('aws_s3_bucket_name');
+      
+			        $awsopts = array( "key" => $this->get_config('aws_key'),
+			                          "secret" => $this->get_config('aws_secret_key'));
+			        $s3 = S3Client::factory($awsopts);
+                
+			        // check the bucket exists
+			        if ($s3->doesBucketExist($bucket)) {
+								try {
+									$count = 0;
+							    $objects = $s3->getIterator('ListObjects', array(
+							        'Bucket' => $bucket
+							    ));
+									
+									foreach ($objects as $object) {
+										$f = serendipity_db_escape_string($object['Key']);
+										$values = array(
+											'object' => $f,
+											'timestamp' => time(),
+											'last_modified' => time()
+										);
+										serendipity_db_insert('aws_objectlist', $values);
+										$count++;
+									}
+									
+									$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS . "($count)");
+									
+								} catch (S3Exception $e) {
+									$this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
+									$this->outputMSG('error', $e->getMessage() . "\n");
+								}
+							} else {
+								$this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
+							}
 						}
-						
-						$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);
 					break;
 					
 					case 'file':
-						$objects = $this->s9y_get_s3_list();
-						$cachefile = $this->get_config('aws_cachefile_name');
-						$objcache = 'templates_c/' . $cachefile;
 						
-						if (is_array($objects)) {
+			      if ((class_exists('Aws\S3\Command\S3Command')) && ($this->get_config('using_aws_s3'))) {
+							
+							$cachefile = $this->get_config('aws_cachefile_name');
+							$objcache = 'templates_c/' . $cachefile;
+							$maxkeys = 1000;
 						
-							$result = file_put_contents($objcache, implode("\n",$objects), LOCK_EX);
-
-							if ($result) {
-								$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS);
-							} else {
-							  $this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
-								$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
+							// truncate the cachefile first
+							$f = @fopen($objcache, "r+");
+							if ($f !== false) {
+							    ftruncate($f, 0);
+							    fclose($f);
 							}
-						} else {
-						  $this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
-							$this->outputMSG('error', sprintf(FILE_WRITE_ERROR, $objcache));
-						}
 						
+			        // get config information
+			        $bucket = $this->get_config('aws_s3_bucket_name');
+      
+			        $awsopts = array( "key" => $this->get_config('aws_key'),
+			                          "secret" => $this->get_config('aws_secret_key'));
+			        $s3 = S3Client::factory($awsopts);
+                
+			        // check the bucket exists
+			        if ($s3->doesBucketExist($bucket)) {
+								try {
+									$count = 0;
+							    $objects = $s3->getIterator('ListObjects', array(
+							        'Bucket' => $bucket,
+											'MaxKeys' => $maxkeys
+							    ));
+									
+									foreach ($objects as $object) {
+										file_put_contents($objcache, $object['Key'] . "\n", FILE_APPEND | LOCK_EX);
+										$count++;
+									}
+									
+									$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS . "($count)");
+									
+									// if ($objects['IsTruncated']) {
+									// 	$this->outputMSG('success', PLUGIN_EVENT_AWS_CACHE_UPDATE_SUCCESS . "($objcache : $count)");
+									// } else {
+									// 	$this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE . " Object list truncated by AWS!");
+									// }
+									
+								} catch (S3Exception $e) {
+									$this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
+									$this->outputMSG('error', $e->getMessage() . "\n");
+								}
+							} else {
+								$this->outputMSG('error', PLUGIN_EVENT_AWS_CACHE_UPDATE_FAILURE);
+							}
+						}
 					break;
 				}
 		}
@@ -407,7 +445,7 @@ class serendipity_event_aws extends serendipity_event
         if (isset($hooks[$event])) {
           switch($event) {
             case 'backend_image_addform':
-              if (class_exists('AmazonS3')) {
+              if (class_exists('Aws\S3\Command\S3Command')) {
                   $checkedY = "";
                   $checkedN = "";
                   $this->get_config('using_aws_s3') ? $checkedY = "checked='checked'" : $checkedN = "checked='checked'";
@@ -428,8 +466,8 @@ class serendipity_event_aws extends serendipity_event
             break;
             
             case 'backend_image_add':
-              // only burn cycles if AmazonS3 class is loaded and radio button for s3 is selected
-              if ((class_exists('AmazonS3')) && ($serendipity['POST']['using_aws_s3'] == YES)) {
+              // only burn cycles if S3Command class is loaded and radio button for s3 is selected
+              if ((class_exists('Aws\S3\Command\S3Command')) && ($serendipity['POST']['using_aws_s3'] == YES)) {
                 
                 $full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
                 $target_img = $eventData;
@@ -489,6 +527,7 @@ class serendipity_event_aws extends serendipity_event
                   if (serendipity_db_bool($this->get_config($temp['name'], true)) && isset($eventData[$temp['element']])) {
                       $element = $temp['element'];
                       $uploadHTTPPath = $serendipity['serendipityHTTPPath'] . $serendipity['uploadHTTPPath'];
+											// error_log("Working with element: " . $element);
                       $eventData[$element] =  $this->s9y_aws_munge($eventData[$element], $uploadHTTPPath);
                     }
                   }
@@ -514,9 +553,9 @@ class serendipity_event_aws extends serendipity_event
 			$bucket = $this->get_config('aws_s3_bucket_name');
       $awsopts = array( "key" => $this->get_config('aws_key'),
                         "secret" => $this->get_config('aws_secret_key'));
-      $s3 = new AmazonS3($awsopts);
+      $s3 = S3Client::factory($awsopts);
 
-      if ($s3->if_bucket_exists($bucket)) {
+      if ($s3->doesBucketExist($bucket)) {
       
         $validate = array();
         foreach ($uploads as $rel_filename => $target_obj) {
@@ -527,24 +566,28 @@ class serendipity_event_aws extends serendipity_event
   				switch($storagetype[$i]) {
   					case 'REDUCED_REDUNDANCY':
               // upload image to amazon s3                
-              $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
-                'fileUpload'    => $target_obj,
-                'acl'           => AmazonS3::ACL_PUBLIC,
+              $media_uploadresponse = $s3->putObject(array(
+								'Key'						=> $rel_filename,
+								'Bucket'				=> $bucket,
+                'SourceFile'    => $target_obj,
+                'ACL'           => AmazonS3::ACL_PUBLIC,
                 'storage'       => AmazonS3::STORAGE_REDUCED
               )); 
             break;
   					case 'STANDARD':
     					// upload image to amazon s3                
-              $media_uploadresponse = $s3->create_object($bucket, $rel_filename, array(
-                'fileUpload'    => $target_obj,
-                'acl'           => AmazonS3::ACL_PUBLIC,
+              $media_uploadresponse = $s3->putObject(array(
+								'Key'						=> $rel_filename,
+								'Bucket'				=> $bucket,
+                'SourceFile'    => $target_obj,
+                'ACL'           => AmazonS3::ACL_PUBLIC,
                 'storage'       => AmazonS3::STORAGE_STANDARD
               )); 
                 
   					break;
 					}
             
-          if ($s3->if_object_exists($bucket, $rel_filename)) {
+          if ($s3->doesObjectExist($bucket, $rel_filename)) {
             $validate[$rel_filename] = true;
 				  } else {
 				    $validate[$rel_filename] = false;
@@ -621,71 +664,122 @@ class serendipity_event_aws extends serendipity_event
     function s9y_aws_munge($text, $uploadHTTPPath) {
   		global $serendipity;
 
-      /* set amazon url + bucket name */
+			// error_log("TEXT: $text");
+
+      // set amazon url + bucket name
       $amazonurl = 'https://s3.amazonaws.com' . '/' . $this->get_config('aws_s3_bucket_name');
-      
-      /* if we are in cache only mode, just replace what we've got in s3 */
+
+      // if we are in cache only mode, only replace what we've got in s3
       if ($this->get_config('aws_cache_only')){
-        /* create an array of patterns and replaces */
+				$images = array();
+        // create an array of patterns and replaces
         $pattern_list = array();
         $replace_list = array();
+				
+				// get the pattern to find all images
+				$pattern = $this->build_image_pattern($uploadHTTPPath);
+				
+				// find all of the images in the given text
+				$nummatches = preg_match_all($pattern, $text, $images);
 
         $objlist_mech = $this->get_config('aws_objlist_mech');
 				$mechlist = $this->get_objlist_mech();
 				switch($mechlist[$objlist_mech]) {
-					case 'none':
-						$bucket_list = $this->s9y_get_s3_list();
-						
-						foreach($bucket_list as $object) {
-		         	$r  = '$1' . $amazonurl . '/' . $object;
-		         	array_push($replace_list, $r);
-
-		         	$p = '(<!-- s9ymdb:\d+ -->.*)' . $uploadHTTPPath . $object;
-		         	$p = str_replace('/','\/', $p);
-		         	$p = '/' . $p . '/';
-		         	array_push($pattern_list, $p);
-		        }
-		
+					case 'none':					
+		        $bucket = $this->get_config('aws_s3_bucket_name');  
+		        $awsopts = array( "key" => $this->get_config('aws_key'),
+		                          "secret" => $this->get_config('aws_secret_key'));	
+		        $s3 = S3Client::factory($awsopts);
+            
+		        // check the bucket exists
+		        if ($s3->doesBucketExist($bucket)) {
+							// for each img we found earlier, check if it exists
+							// in S3, if so, add it to the pattern_list and the
+							// replacement to the replacement_list
+							foreach($images[1] as $imgrel) {
+								try {
+									// error_log("Checking if /$imgrel exists at amazon!");
+									if($s3->doesObjectExist($bucket, '/' . $imgrel)) {
+										// error_log("/$imgrel exists at amazon!");
+										
+										$srcpat = '"' . $uploadHTTPPath . $imgrel . '"'; 
+										$reppat = $amazonurl . '/' . $imgrel;
+										array_push($pattern_list, preg_quote($srcpat));
+										array_push($replace_list, $reppat);
+									} else {
+										error_log("$imgrel does not exist at amazon!");
+									}
+								} catch (S3Exception $e) {
+									error_log("ERROR checking S3 for image: /" . $imgrel);
+								}	
+							}
+						} else {
+							error_log("ERROR Bucket does not exist: " . $bucket);
+						}
 					break;
 					
 					case 'database':
-						/* incremental changes... will make this better */
- 						$bucket_list = serendipity_db_query("SELECT object FROM {$serendipity['dbPrefix']}aws_objectlist");
+					
+						// for each img we found earlier, check if it exists
+						// in the db object cache, if so, add it to the pattern_list 
+						// and the replacement to the replacement_list
+						foreach($images[1] as $imgrel) {
+							try {
+								$whereobj = serendipity_db_escape_string($imgrel);
+								$query = "SELECT object FROM {$serendipity['dbPrefix']}aws_objectlist WHERE object LIKE '$whereobj'";
+								$cached_obj = serendipity_db_query($query, true);
+								// error_log("Checking if " . $imgrel . " exists in the database! Query: " . $query . " Result: " . $cached_obj[0]);
+								
+								if ($imgrel == $cached_obj[0]) {
+									// error_log("$imgrel exists in the database!");
+									$srcpat = '"' . $uploadHTTPPath . $imgrel . '"';
+									$reppat = $amazonurl . '/' . $imgrel;
+									array_push($pattern_list, preg_quote($srcpat));
+									array_push($replace_list, $reppat);
+								} else {
+									error_log("$imgrel does not exist in the database cache!");
+								}
+							} catch (Exception $e) {
+								error_log("ERROR checking DB cache for image: " . $imgrel . "Exception: " . $e->getMessage());
+							}	
+						}
 
-		        foreach($bucket_list as $i) {
-							$object = $i['object'];
-
-		         	$r  = '$1' . $amazonurl . '/' . $object;
-		         	array_push($replace_list, $r);
-
-		         	$p = '(<!-- s9ymdb:\d+ -->.*)' . $uploadHTTPPath . $object;
-		         	$p = str_replace('/','\/', $p);
-		         	$p = '/' . $p . '/';
-		         	array_push($pattern_list, $p);
-		        }
-		
 					break;
 					
 					case 'file':
 					  $cachefile = $this->get_config('aws_cachefile_name');
 						$target = 'templates_c/' . $cachefile;
-						$bucket_list = file($target);
 						
-						foreach($bucket_list as $i) {
-							$object = rtrim($i);
-
-		         	$r  = '$1' . $amazonurl . '/' . $object;
-		         	array_push($replace_list, $r);
-
-		         	$p = '(<!-- s9ymdb:\d+ -->.*)' . $uploadHTTPPath . $object;
-		         	$p = str_replace('/','\/', $p);
-		         	$p = '/' . $p . '/';
-		         	array_push($pattern_list, $p);
-		
-							/* Testing
-							$text = $text . "Pattern: $p  REPLACE: $r \n";
-							*/
-		        }
+						if(file_exists($target)) {
+							$filecontents = file($target);
+							
+							// for each img we found earlier, check if it exists
+							// in the file object cache, if so, add it to the pattern_list 
+							// and the replacement to the replacement_list
+							foreach($images[1] as $imgrel) {
+								try {
+									// error_log("Checking if " . $imgrel . " exists in the file cache! File: " . $target);
+									$cached_obj = preg_grep("#^$imgrel#", file($target));
+									$cached_obj = array_shift($cached_obj);
+									$cached_obj = rtrim($cached_obj);
+									// error_log("Result: " . $cached_obj);
+									
+									if($cached_obj == $imgrel) {
+										// error_log("$imgrel exists in the file cache!");
+										$srcpat = '"' . $uploadHTTPPath . $imgrel . '"';
+										$reppat = $amazonurl . '/' . $imgrel;
+										array_push($pattern_list, preg_quote($srcpat));
+										array_push($replace_list, $reppat);
+									} else {
+										error_log("$imgrel does not exist in the file cache!");
+									}
+								} catch (Exception $e) {
+									error_log("ERROR checking file cache for image: " . $imgrel . "Exception: " . $e->getMessage());
+								}	
+							}
+						} else {
+							error_log("ERROR: file cache ". $target . "does not exist.");
+						}
 					break;
 					
 				}
@@ -693,7 +787,10 @@ class serendipity_event_aws extends serendipity_event
         /* munge!  note: we are passing 2 arrays here */
         $text = preg_replace($pattern_list, $replace_list, $text);
 
-      } else {   // otherwise replace all s9y media db stuff
+      } else {   
+				// TODO: revisit this with new pattern matching!
+				// this replaces everything up to the upload path... probably we should
+				// replace the src=".*?" instead
         $pattern = '(<!-- s9ymdb:\d+ -->.*)' . $uploadHTTPPath;
         $pattern = str_replace('/','\/', $pattern);
         $pattern = '/' . $pattern . '/';
@@ -709,6 +806,24 @@ class serendipity_event_aws extends serendipity_event
     }
 
 		/*
+		 * Build the image finding pattern
+		 */
+		function build_image_pattern($uploadHTTPPath) {
+			$pattern = '/';
+			$pattern = $pattern . preg_quote('<!-- s9ymdb:', '/');
+			$pattern = $pattern . '\d+\s+';
+			$pattern = $pattern . preg_quote('--><img', '/');
+			$pattern = $pattern . '.*?';
+			$pattern = $pattern . preg_quote('src="', '/');
+			$pattern = $pattern . preg_quote($uploadHTTPPath, '/');
+			$pattern = $pattern . '(.*?)".*?';
+			$pattern = $pattern . preg_quote('/>', '/');
+			$pattern = $pattern . '/';
+			
+			return $pattern;
+		}
+
+		/*
      * Get a list of stuff in the bucket
 		 */
     function s9y_get_s3_list() {
@@ -716,16 +831,16 @@ class serendipity_event_aws extends serendipity_event
       // set response to empty array
       $response = array();
       
-      if ((class_exists('AmazonS3')) && ($this->get_config('using_aws_s3'))) {
+      if ((class_exists('Aws\S3\Command\S3Command')) && ($this->get_config('using_aws_s3'))) {
         // get config information
         $bucket         = $this->get_config('aws_s3_bucket_name');
       
         $awsopts = array( "key" => $this->get_config('aws_key'),
                           "secret" => $this->get_config('aws_secret_key'));
-        $s3 = new AmazonS3($awsopts);
+        $s3 = S3Client::factory($awsopts);
                 
         // check the bucket exists
-        if ($s3->if_bucket_exists($bucket)) {
+        if ($s3->doesBucketExist($bucket)) {
           // get the object list from s3
           $response = $s3->get_object_list($bucket);
         }
