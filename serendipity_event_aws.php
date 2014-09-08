@@ -472,7 +472,7 @@ class serendipity_event_aws extends serendipity_event
                 $full_path = $serendipity['serendipityPath'] . $serendipity['uploadPath'];
                 $target_img = $eventData;
               
-                preg_match('@(^.*/)+(.*)\.+(\w*)@',$target_img, $matches);
+                preg_match('@(^.*/)+(.*)\.+(\w*)@', $target_img, $matches);
                 $target_dir   = $matches[1];
                 $basename     = $matches[2];
                 $extension    = $matches[3];
@@ -563,6 +563,13 @@ class serendipity_event_aws extends serendipity_event
           $i = $this->get_config('aws_s3_storage_type');
   				$storagetype = $this->get_s3_storage_types();
 
+					$subdir = $this->get_config('aws_s3_bucket_subdir');
+					if (($subdir != '') && ($subdir != '/')) {
+						$rel_filename = $subdir . '/' . $rel_filename;
+					}
+					
+					error_log("Subdir: " . $subdir . " Relfilename: " . $rel_filename);
+
   				switch($storagetype[$i]) {
   					case 'REDUCED_REDUNDANCY':
               // upload image to amazon s3                
@@ -570,8 +577,8 @@ class serendipity_event_aws extends serendipity_event
 								'Key'						=> $rel_filename,
 								'Bucket'				=> $bucket,
                 'SourceFile'    => $target_obj,
-                'ACL'           => AmazonS3::ACL_PUBLIC,
-                'storage'       => AmazonS3::STORAGE_REDUCED
+                'ACL'           => 'public-read',
+                'storage'       => 'REDUCED_REDUNDANCY'
               )); 
             break;
   					case 'STANDARD':
@@ -580,8 +587,8 @@ class serendipity_event_aws extends serendipity_event
 								'Key'						=> $rel_filename,
 								'Bucket'				=> $bucket,
                 'SourceFile'    => $target_obj,
-                'ACL'           => AmazonS3::ACL_PUBLIC,
-                'storage'       => AmazonS3::STORAGE_STANDARD
+                'ACL'           => 'public-read',
+                'storage'       => 'STANDARD'
               )); 
                 
   					break;
@@ -631,10 +638,12 @@ class serendipity_event_aws extends serendipity_event
 						'timestamp' => time(),
 						'last_modified' => time()
 						);
-					
+					error_log("checking if $filename is in the cache already...");
 					if ($id) {
+						error_log("$filename found in the cache!");
 						$result = serendipity_db_update('aws_objectlist', array('id' => $id), $value);
 					}	else {
+						error_log("$filename not found in the cache, updating!");
 						$result = serendipity_db_insert('aws_objectlist', $value);
 					}
           // TODO: add validation of cache update
@@ -642,6 +651,7 @@ class serendipity_event_aws extends serendipity_event
 				break;
 				
 				case 'file':
+					// TODO: check if it's already in the cache
 				  $cachefile = $this->get_config('aws_cachefile_name');
 					$objcache = 'templates_c/' . $cachefile;
 					
@@ -663,8 +673,6 @@ class serendipity_event_aws extends serendipity_event
 		 */
     function s9y_aws_munge($text, $uploadHTTPPath) {
   		global $serendipity;
-
-			// error_log("TEXT: $text");
 
       // set amazon url + bucket name
       $amazonurl = 'https://s3.amazonaws.com' . '/' . $this->get_config('aws_s3_bucket_name');
